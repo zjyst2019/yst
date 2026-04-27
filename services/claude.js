@@ -9,6 +9,7 @@ const activeRequests = new Map();
 
 // System prompt cache (loaded once at startup, shared across all users)
 let systemPrompt = null;
+let systemPromptFilePath = null;  // Store the file path for CLI mode
 
 // Configuration: use SDK or CLI (CLI is default for knowledge base support)
 const USE_SDK = process.env.USE_SDK === 'true'; // Default to CLI, set USE_SDK=true to use SDK
@@ -47,14 +48,16 @@ function getAnthropicClient() {
  */
 function loadSystemPrompt(filePath) {
     const promptPath = filePath || process.env.SYSTEM_PROMPT_FILE || './CLAUDE.md';
-    const absolutePath = path.resolve(promptPath);
+    systemPromptFilePath = path.resolve(promptPath);
 
-    if (fs.existsSync(absolutePath)) {
-        systemPrompt = fs.readFileSync(absolutePath, 'utf-8');
-        console.log(`System prompt loaded: ${systemPrompt.length} characters from ${absolutePath}`);
+    if (fs.existsSync(systemPromptFilePath)) {
+        systemPrompt = fs.readFileSync(systemPromptFilePath, 'utf-8');
+        console.log(`System prompt loaded: ${systemPrompt.length} characters from ${systemPromptFilePath}`);
+        console.log(`System prompt preview (first 200 chars): ${systemPrompt.substring(0, 200)}`);
         return true;
     }
-    console.log(`System prompt file not found: ${absolutePath}`);
+    console.log(`System prompt file not found: ${systemPromptFilePath}`);
+    systemPromptFilePath = null;
     return false;
 }
 
@@ -63,6 +66,13 @@ function loadSystemPrompt(filePath) {
  */
 function getSystemPrompt() {
     return systemPrompt;
+}
+
+/**
+ * Get the system prompt file path (for CLI mode)
+ */
+function getSystemPromptFilePath() {
+    return systemPromptFilePath;
 }
 
 /**
@@ -182,9 +192,10 @@ function executeClaudeCLI(sessionId, prompt, history, onStream, onComplete, onEr
         args.push('--model', process.env.CLAUDE_MODEL);
     }
 
-    // Add system prompt if loaded (CLAUDE.md content)
-    if (systemPrompt) {
-        args.push('--append-system-prompt', systemPrompt);
+    // Add system prompt using file path (better for multi-line content)
+    // Use --append-system-prompt-file to avoid shell truncation issues
+    if (systemPromptFilePath) {
+        args.push('--append-system-prompt-file', systemPromptFilePath);
     }
 
     // Format history messages into prompt context
@@ -369,6 +380,7 @@ function getMode() {
 module.exports = {
     loadSystemPrompt,
     getSystemPrompt,
+    getSystemPromptFilePath,
     buildMessages,
     executeClaude,
     stopClaude,
