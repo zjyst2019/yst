@@ -65,6 +65,27 @@ http://localhost:3000
 - 默认端口: 3000
 - 可通过环境变量 PORT 自定义: PORT=8080 npm start
 
+## Claude CLI 工作目录配置
+
+如果需要让 Claude CLI 在特定目录执行（例如包含知识库文档的目录），可以通过环境变量配置:
+
+```bash
+# 设置 Claude CLI 工作目录（知识库目录）
+CLAUDE_WORK_DIR=/path/to/your/knowledge-base npm start
+```
+
+示例:
+```bash
+# Windows
+set CLAUDE_WORK_DIR=C:\yst\my_knowledge_base
+npm start
+
+# Linux/macOS
+CLAUDE_WORK_DIR=/home/user/my_knowledge_base npm start
+```
+
+这样 Claude CLI 会在该目录下执行，可以访问该目录下的文档作为上下文。
+
 ## 数据库
 
 - SQLite 数据库文件将自动创建在 data/chat.db

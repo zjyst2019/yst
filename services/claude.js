@@ -1,5 +1,6 @@
 // services/claude.js
 const { spawn } = require('child_process');
+const fs = require('fs');
 
 // Map to track active processes per session
 const activeProcesses = new Map();
@@ -26,7 +27,7 @@ function executeClaude(sessionId, prompt, onStream, onComplete, onError) {
         '--model', 'sonnet',
         prompt
     ], {
-        cwd: process.cwd(),
+        cwd: process.env.CLAUDE_WORK_DIR || process.cwd(),
         env: { ...process.env },
         shell: true
     });
@@ -111,8 +112,29 @@ function isActive(sessionId) {
     return activeProcesses.has(sessionId);
 }
 
+/**
+ * Set Claude CLI working directory
+ * @param {string} dirPath - Directory path for knowledge base context
+ */
+function setWorkDir(dirPath) {
+    if (fs.existsSync(dirPath)) {
+        process.env.CLAUDE_WORK_DIR = dirPath;
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Get current Claude CLI working directory
+ */
+function getWorkDir() {
+    return process.env.CLAUDE_WORK_DIR || process.cwd();
+}
+
 module.exports = {
     executeClaude,
     stopClaude,
-    isActive
+    isActive,
+    setWorkDir,
+    getWorkDir
 };
