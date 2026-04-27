@@ -3,6 +3,7 @@ const messagesEl = document.getElementById('messages');
 const inputEl = document.getElementById('input');
 const sendBtn = document.getElementById('send-btn');
 const stopBtn = document.getElementById('stop-btn');
+const clearBtn = document.getElementById('clear-btn');
 const statusEl = document.getElementById('status');
 
 let ws = null;
@@ -108,6 +109,15 @@ function handleMessage(msg) {
             stopBtn.disabled = true;
             sendBtn.disabled = false;
             break;
+
+        case 'cleared':
+            // Conversation cleared, reset UI
+            messagesEl.innerHTML = '';
+            currentAssistantMessage = null;
+            isProcessing = false;
+            stopBtn.disabled = true;
+            sendBtn.disabled = false;
+            break;
     }
 }
 
@@ -169,9 +179,23 @@ function stopGeneration() {
     ws.send(JSON.stringify({ type: 'stop' }));
 }
 
+function clearConversation() {
+    // Clear messages in UI
+    messagesEl.innerHTML = '';
+
+    // Generate new session ID
+    sessionId = generateUUID();
+    localStorage.setItem('sessionId', sessionId);
+
+    // Notify server to clear history and join new session
+    ws.send(JSON.stringify({ type: 'clear' }));
+    ws.send(JSON.stringify({ type: 'join', session_id: sessionId }));
+}
+
 // Event listeners
 sendBtn.addEventListener('click', sendMessage);
 stopBtn.addEventListener('click', stopGeneration);
+clearBtn.addEventListener('click', clearConversation);
 
 inputEl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {

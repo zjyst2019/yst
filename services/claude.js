@@ -2,12 +2,19 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const { spawn } = require('child_process');
 const fs = require('fs');
+const path = require('path');
 
 // Map to track active requests per session
 const activeRequests = new Map();
 
+// System prompt cache (loaded once at startup, shared across all users)
+let systemPrompt = null;
+
 // Configuration: use SDK (default) or CLI
 const USE_SDK = process.env.USE_SDK !== 'false'; // Default to SDK, set USE_SDK=false to use CLI
+
+// Max history messages to include in context
+const MAX_HISTORY = parseInt(process.env.MAX_HISTORY_MESSAGES) || 5;
 
 // Initialize Anthropic SDK client (singleton, reused across requests)
 let anthropicClient = null;
@@ -35,9 +42,62 @@ function getAnthropicClient() {
 }
 
 /**
- * Execute Claude using SDK with streaming output
+ * Load system prompt from file (CLAUDE.md or custom path)
+ * Called once at startup, cached for all subsequent requests
  */
-async function executeClaudeSDK(sessionId, prompt, onStream, onComplete, onError) {
+function loadSystemPrompt(filePath) {
+    const promptPath = filePath || process.env.SYSTEM_PROMPT_FILE || './CLAUDE.md';
+    const absolutePath = path.resolve(promptPath);
+
+    if (fs.existsSync(absolutePath)) {
+        systemPrompt = fs.readFileSync(absolutePath, 'utf-8');
+        console.log(`System prompt loaded: ${systemPrompt.length} characters from ${absolutePath}`);
+        return true;
+    }
+    console.log(`System prompt file not found: ${absolutePath}`);
+    return false;
+}
+
+/**
+ * Get the cached system prompt
+ */
+function getSystemPrompt() {
+    return systemPrompt;
+}
+
+/**
+ * Build messages array for API request
+ * Includes history messages + new user message
+ */
+function buildMessages(history, userMessage) {
+    const messages = [];
+
+    // Add history messages (if any)
+    if (history && history.length > 0) {
+        for (const msg of history) {
+            messages.push({
+                role: msg.role,
+                content: msg.content
+            });
+        }
+    }
+
+    // Add new user message
+    messages.push({ role: 'user', content: userMessage });
+
+    return messages;
+}
+
+/**
+ * Execute Claude using SDK with streaming output
+ * @param {string} sessionId - Session identifier
+ * @param {string} prompt - User's current question
+ * @param {Array} history - History messages (from database)
+ * @param {function} onStream - Callback for each streaming chunk
+ * @param {function} onComplete - Callback when complete
+ * @param {function} onError - Callback for errors
+ */
+async function executeClaudeSDK(sessionId, prompt, history, onStream, onComplete, onError) {
     if (activeRequests.has(sessionId)) {
         onError('A request is already processing for this session');
         return null;
@@ -50,13 +110,19 @@ async function executeClaudeSDK(sessionId, prompt, onStream, onComplete, onError
     let fullContent = '';
 
     try {
-        const stream = client.messages.stream({
+        // Build request with system prompt and history
+        const requestOptions = {
             model: process.env.CLAUDE_MODEL || 'claude-sonnet-4-20250514',
             max_tokens: 4096,
-            messages: [
-                { role: 'user', content: prompt }
-            ],
-        }, {
+            messages: buildMessages(history, prompt),
+        };
+
+        // Add system prompt if loaded
+        if (systemPrompt) {
+            requestOptions.system = systemPrompt;
+        }
+
+        const stream = client.messages.stream(requestOptions, {
             signal: abortController.signal
         });
 
@@ -84,8 +150,9 @@ async function executeClaudeSDK(sessionId, prompt, onStream, onComplete, onError
 
 /**
  * Execute Claude using CLI with streaming output (fallback method)
+ * Note: CLI mode doesn't support system prompt, but can read CLAUDE.md from work directory
  */
-function executeClaudeCLI(sessionId, prompt, onStream, onComplete, onError) {
+function executeClaudeCLI(sessionId, prompt, history, onStream, onComplete, onError) {
     if (activeRequests.has(sessionId)) {
         onError('A request is already processing for this session');
         return null;
@@ -161,12 +228,18 @@ function executeClaudeCLI(sessionId, prompt, onStream, onComplete, onError) {
 /**
  * Execute Claude with streaming output
  * Uses SDK by default, CLI as fallback
+ * @param {string} sessionId - Session identifier
+ * @param {string} prompt - User's current question
+ * @param {Array} history - History messages (from database, optional)
+ * @param {function} onStream - Callback for each streaming chunk
+ * @param {function} onComplete - Callback when complete
+ * @param {function} onError - Callback for errors
  */
-function executeClaude(sessionId, prompt, onStream, onComplete, onError) {
+function executeClaude(sessionId, prompt, history, onStream, onComplete, onError) {
     if (USE_SDK) {
-        return executeClaudeSDK(sessionId, prompt, onStream, onComplete, onError);
+        return executeClaudeSDK(sessionId, prompt, history, onStream, onComplete, onError);
     } else {
-        return executeClaudeCLI(sessionId, prompt, onStream, onComplete, onError);
+        return executeClaudeCLI(sessionId, prompt, history, onStream, onComplete, onError);
     }
 }
 
@@ -220,6 +293,9 @@ function getMode() {
 }
 
 module.exports = {
+    loadSystemPrompt,
+    getSystemPrompt,
+    buildMessages,
     executeClaude,
     stopClaude,
     isActive,

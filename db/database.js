@@ -41,11 +41,27 @@ function getMessages(sessionId) {
     ).all(sessionId);
 }
 
+// Get recent messages for context (limited to MAX_HISTORY_MESSAGES)
+function getRecentMessages(sessionId, limit = 5) {
+    // Get recent messages in descending order, then reverse to get chronological order
+    const messages = db.prepare(
+        'SELECT role, content FROM messages WHERE session_id = ? ORDER BY created_at DESC LIMIT ?'
+    ).all(sessionId, limit);
+    return messages.reverse();
+}
+
+// Clear all messages for a session (for "clear conversation" feature)
+function clearSessionMessages(sessionId) {
+    db.prepare('DELETE FROM messages WHERE session_id = ?').run(sessionId);
+}
+
 module.exports = {
     createSession,
     getSession,
     updateLastActive,
     deleteSession,
     addMessage,
-    getMessages
+    getMessages,
+    getRecentMessages,
+    clearSessionMessages
 };

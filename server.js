@@ -13,17 +13,26 @@ const wss = new WebSocket.Server({ server });
 
 const PORT = process.env.PORT || 3000;
 
+// Load system prompt at startup (CLAUDE.md for knowledge base context)
+const systemPromptPath = process.env.SYSTEM_PROMPT_FILE;
+if (systemPromptPath) {
+    claudeService.loadSystemPrompt(systemPromptPath);
+} else {
+    // Try default path
+    claudeService.loadSystemPrompt('./CLAUDE.md');
+}
+
 // Configure Claude mode and working directory
 console.log(`Claude mode: ${claudeService.getMode()}`);
+if (claudeService.getSystemPrompt()) {
+    console.log(`System prompt: loaded (${claudeService.getSystemPrompt().length} characters)`);
+} else {
+    console.log(`System prompt: not loaded (no CLAUDE.md found)`);
+}
 if (process.env.ANTHROPIC_BASE_URL) {
     console.log(`Claude API endpoint: ${process.env.ANTHROPIC_BASE_URL} (private gateway)`);
 } else {
     console.log(`Claude API endpoint: https://api.anthropic.com (official)`);
-}
-if (process.env.CLAUDE_WORK_DIR) {
-    console.log(`Claude working directory: ${process.env.CLAUDE_WORK_DIR}`);
-} else {
-    console.log(`Claude working directory: ${process.cwd()} (default)`);
 }
 if (process.env.CLAUDE_MODEL) {
     console.log(`Claude model: ${process.env.CLAUDE_MODEL}`);
@@ -65,10 +74,14 @@ wss.on('connection', (ws) => {
                     db.addMessage(currentSessionId, 'user', msg.content);
                     db.updateLastActive(currentSessionId);
 
-                    // Execute Claude CLI
+                    // Get history messages for context
+                    const historyMessages = db.getRecentMessages(currentSessionId, 5);
+
+                    // Execute Claude with history context
                     claudeService.executeClaude(
                         currentSessionId,
                         msg.content,
+                        historyMessages,  // Pass history for context
                         // onStream
                         (chunk) => {
                             ws.send(JSON.stringify({ type: 'stream', content: chunk }));
@@ -83,6 +96,14 @@ wss.on('connection', (ws) => {
                             ws.send(JSON.stringify({ type: 'error', message: error }));
                         }
                     );
+                    break;
+
+                case 'clear':
+                    // Clear conversation history
+                    if (currentSessionId) {
+                        db.clearSessionMessages(currentSessionId);
+                        ws.send(JSON.stringify({ type: 'cleared' }));
+                    }
                     break;
 
                 case 'stop':

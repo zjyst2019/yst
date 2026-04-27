@@ -33,8 +33,11 @@ npm install
 
 ```bash
 # Windows
-set ANTHROPIC_API_KEY=your_api_key
+set ANTHROPIC_BASE_URL=
+set ANTHROPIC_API_KEY=
+set CLAUDE_MODEL=GLM-5
 
+npm start
 # Linux/macOS
 export ANTHROPIC_API_KEY=your_api_key
 ```
@@ -136,6 +139,29 @@ claude_web_server/
 | `USE_SDK` | 是否使用 SDK 模式 | true |
 | `CLAUDE_WORK_DIR` | CLI 模式工作目录 | 当前目录 |
 | `CLAUDE_MODEL` | Claude 模型 | claude-sonnet-4-20250514 |
+| `SYSTEM_PROMPT_FILE` | 系统提示文件（CLAUDE.md） | ./CLAUDE.md |
+| `MAX_HISTORY_MESSAGES` | 最大历史消息数 | 5 |
+
+## 系统提示（知识库上下文）
+
+启动时可以加载 CLAUDE.md 文件作为系统提示，让模型了解知识库结构：
+
+```bash
+# Windows
+set SYSTEM_PROMPT_FILE=C:\path\to\CLAUDE.md
+set ANTHROPIC_API_KEY=your_api_key
+npm start
+
+# Linux/macOS
+SYSTEM_PROMPT_FILE=/path/to/CLAUDE.md ANTHROPIC_API_KEY=your_api_key npm start
+```
+
+如果不设置 `SYSTEM_PROMPT_FILE`，会尝试加载当前目录下的 `CLAUDE.md`。
+
+**优势：**
+- 系统提示只加载一次，不重复读取
+- 所有用户共享系统提示，各自独立对话历史
+- 每次请求自动带入最近 5 条历史消息
 
 ## 私网模型支持
 
