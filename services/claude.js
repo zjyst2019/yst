@@ -10,8 +10,8 @@ const activeRequests = new Map();
 // System prompt cache (loaded once at startup, shared across all users)
 let systemPrompt = null;
 
-// Configuration: use SDK (default) or CLI
-const USE_SDK = process.env.USE_SDK !== 'false'; // Default to SDK, set USE_SDK=false to use CLI
+// Configuration: use SDK or CLI (CLI is default for knowledge base support)
+const USE_SDK = process.env.USE_SDK === 'true'; // Default to CLI, set USE_SDK=true to use SDK
 
 // Max history messages to include in context
 const MAX_HISTORY = parseInt(process.env.MAX_HISTORY_MESSAGES) || 5;
@@ -149,8 +149,9 @@ async function executeClaudeSDK(sessionId, prompt, history, onStream, onComplete
 }
 
 /**
- * Execute Claude using CLI with streaming output (fallback method)
- * Note: CLI mode doesn't support system prompt, but can read CLAUDE.md from work directory
+ * Execute Claude using CLI with streaming output
+ * Uses --append-system-prompt to pass CLAUDE.md content as system prompt
+ * History messages are formatted and prepended to the prompt
  */
 function executeClaudeCLI(sessionId, prompt, history, onStream, onComplete, onError) {
     if (activeRequests.has(sessionId)) {
@@ -158,13 +159,38 @@ function executeClaudeCLI(sessionId, prompt, history, onStream, onComplete, onEr
         return null;
     }
 
-    const child = spawn('claude', [
+    // Build CLI arguments
+    const args = [
         '-p',
         '--output-format', 'stream-json',
         '--verbose',
-        '--model', process.env.CLAUDE_MODEL || 'sonnet',
-        prompt
-    ], {
+        '--model', process.env.CLAUDE_MODEL || 'sonnet'
+    ];
+
+    // Add system prompt if loaded (CLAUDE.md content)
+    if (systemPrompt) {
+        args.push('--append-system-prompt', systemPrompt);
+    }
+
+    // Format history messages into prompt context
+    let fullPrompt = '';
+    if (history && history.length > 0) {
+        fullPrompt = '以下是之前的对话历史：\n\n';
+        for (const msg of history) {
+            if (msg.role === 'user') {
+                fullPrompt += `用户: ${msg.content}\n`;
+            } else if (msg.role === 'assistant') {
+                fullPrompt += `助手: ${msg.content}\n`;
+            }
+        }
+        fullPrompt += '\n---\n\n';
+    }
+    fullPrompt += prompt;
+
+    // Add prompt
+    args.push(fullPrompt);
+
+    const child = spawn('claude', args, {
         cwd: process.env.CLAUDE_WORK_DIR || process.cwd(),
         env: { ...process.env },
         shell: true

@@ -6,9 +6,10 @@
    - 用于运行服务器和安装 npm 包
    - 下载: https://nodejs.org/
 
-2. Claude API Key 或私网模型网关
-   - Anthropic API Key (官方 API)
-   - 或私网部署的模型网关地址和 API Key
+2. Claude CLI (@anthropic-ai/claude-code)
+   - 用于调用 Claude API 并读取本地知识库文档
+   - 安装: npm install -g @anthropic-ai/claude-code
+   - 需要配置 Anthropic API Key 或私网网关认证
 
 3. Git (可选，用于版本控制)
    - 下载: https://git-scm.com/
@@ -22,34 +23,20 @@
 - better-sqlite3@^12.9.0 - SQLite 数据库绑定
 - uuid@^9.0.1            - UUID 生成工具
 - marked@^12.0.0         - Markdown 解析器 (前端使用 CDN 版本)
-- @anthropic-ai/sdk      - Anthropic API SDK (高效调用)
+- @anthropic-ai/sdk      - Anthropic API SDK (可选模式)
 
-## 系统提示文件 (可选)
+## Claude CLI 认证
 
-- CLAUDE.md - 知识库结构说明文件
-  - 启动时加载，作为系统提示
-  - 所有用户共享，不重复读取
-  - 提升问答效率，避免重复扫描知识库
+Claude CLI 需要以下认证方式之一:
 
-## 环境变量配置
+1. Anthropic API Key
+   - 设置环境变量: ANTHROPIC_API_KEY=your_api_key
 
-### 必须配置
-
-| 变量 | 说明 |
-|------|------|
-| ANTHROPIC_API_KEY | API Key (必须) |
-
-### 可选配置
-
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| PORT | 服务器端口 | 3000 |
-| ANTHROPIC_BASE_URL | API 网关地址 (私网模型) | Anthropic 官方 |
-| CLAUDE_MODEL | 模型名称 | claude-sonnet-4-20250514 |
-| SYSTEM_PROMPT_FILE | 系统提示文件路径 | ./CLAUDE.md |
-| MAX_HISTORY_MESSAGES | 最大历史消息数 | 5 |
-| USE_SDK | 是否使用 SDK 模式 | true |
-| CLAUDE_WORK_DIR | CLI 模式工作目录 | 当前目录 |
+2. 私网模型网关
+   - 设置环境变量:
+     - ANTHROPIC_BASE_URL=http://your-gateway:8080
+     - ANTHROPIC_API_KEY=your_api_key
+     - CLAUDE_MODEL=your_model_name
 
 ## 快速安装步骤
 
@@ -57,61 +44,90 @@
 # Windows: 从 https://nodejs.org/ 下载安装包
 # macOS/Linux: 使用包管理器安装
 
-# 2. 进入项目目录
+# 2. 安装 Claude CLI
+npm install -g @anthropic-ai/claude-code
+
+# 3. 进入项目目录
 cd claude_web_server
 
-# 3. 安装项目依赖
+# 4. 安装项目依赖
 npm install
 
-# 4. 配置环境变量 (Windows)
+# 5. 配置环境变量 (Windows - CLI 模式)
 set ANTHROPIC_API_KEY=your_api_key
 set ANTHROPIC_BASE_URL=http://192.168.1.100:8080
 set CLAUDE_MODEL=MiniMax-M2.7
-set SYSTEM_PROMPT_FILE=path\to\CLAUDE.md
+set CLAUDE_WORK_DIR=D:\knowledge-base
+set SYSTEM_PROMPT_FILE=D:\knowledge-base\CLAUDE.md
 
-# 5. 启动服务器
+# 6. 启动服务器
 npm start
 
-# 6. 打开浏览器访问
+# 7. 打开浏览器访问
 http://localhost:3000
 
-## 私网模型配置示例
+## CLI 模式 vs SDK 模式
 
-# Windows
-set ANTHROPIC_BASE_URL=http://192.168.1.100:8080
-set ANTHROPIC_API_KEY=sk-xxx
-set CLAUDE_MODEL=MiniMax-M2.7
-npm start
+| 模式 | 知识库支持 | 配置 |
+|------|-----------|------|
+| CLI (默认) | 支持 | 需要 Claude CLI + CLAUDE_WORK_DIR |
+| SDK | 不支持 | 仅需 API Key |
 
-# Linux/macOS
-ANTHROPIC_BASE_URL=http://192.168.1.100:8080 ANTHROPIC_API_KEY=sk-xxx CLAUDE_MODEL=MiniMax-M2.7 npm start
+CLI 模式下，Claude CLI 会:
+1. 在 CLAUDE_WORK_DIR 目录下执行
+2. 读取目录下的文档作为上下文
+3. CLAUDE.md 作为系统提示，指导如何使用知识库
+
+## 环境变量配置表
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| PORT | 服务器端口 | 3000 |
+| ANTHROPIC_API_KEY | API Key | 必须 |
+| ANTHROPIC_BASE_URL | API 网关地址 | Anthropic 官方 |
+| CLAUDE_MODEL | 模型名称 | claude-sonnet-4-20250514 |
+| CLAUDE_WORK_DIR | 知识库目录 (CLI 模式) | 当前目录 |
+| SYSTEM_PROMPT_FILE | 系统提示文件路径 | ./CLAUDE.md |
+| MAX_HISTORY_MESSAGES | 最大历史消息数 | 5 |
+| USE_SDK | 是否使用 SDK 模式 | false |
+
+## 知识库配置
+
+1. CLAUDE.md 文件
+   - 放在知识库目录下
+   - 描述知识库结构和文档位置
+   - 启动时作为系统提示加载
+
+2. 知识库目录结构示例
+   ```
+   knowledge-base/
+   ├── CLAUDE.md           # 知识库说明（系统提示）
+   ├── wiki/
+   │   ├── index.md        # 知识目录
+   │   ├── guide/          # 使用指南
+   │   └── api/            # API 文档
+   └── docs/
+       └── ...
+   ```
+
+3. CLAUDE.md 内容示例
+   ```markdown
+   # 项目知识库
+
+   ## 文档结构
+   - wiki/index.md - 知识目录
+   - wiki/guide/ - 使用指南
+   - wiki/api/ - API 文档
+
+   ## 查询建议
+   先查阅 index.md 了解文档位置，再定位具体内容。
+   ```
 
 ## 数据库
 
 - SQLite 数据库文件将自动创建在 data/chat.db
 - 无需额外安装数据库服务
 - 存储用户会话和聊天历史
-
-## 知识库上下文配置
-
-如果需要在知识库目录下运行:
-
-1. 创建 CLAUDE.md 文件，描述知识库结构
-2. 设置 SYSTEM_PROMPT_FILE 环境变量指向该文件
-3. 启动时自动加载，所有问答共享该上下文
-
-示例 CLAUDE.md 内容:
-```markdown
-# 项目知识库
-
-## 文档结构
-- wiki/index.md - 知识目录
-- wiki/guide/ - 使用指南
-- wiki/api/ - API 文档
-
-## 查询建议
-先查阅 index.md 了解文档位置，再定位具体内容。
-```
 
 ## 端口要求
 
@@ -122,5 +138,5 @@ ANTHROPIC_BASE_URL=http://192.168.1.100:8080 ANTHROPIC_API_KEY=sk-xxx CLAUDE_MOD
 ## 网络要求
 
 - 如使用私网模型，确保网关地址可达
-- 可通过 ping 和 curl 测试连通性
-- ping 通 + curl 返回空白 = 正常 (API 端点可能不响应根路径)
+- 可通过 ping 测试连通性
+- ping 通 = 网络正常

@@ -1,6 +1,6 @@
 # eVS Wiki Chat Server
 
-一个基于 Claude API 的 Web 聊天服务器，支持流式输出、多用户并发和知识库上下文。
+一个基于 Claude CLI 的 Web 聊天服务器，支持流式输出、多用户并发和知识库上下文。
 
 ## 功能特性
 
@@ -9,14 +9,16 @@
 - 支持多用户并发使用（不同设备自动隔离）
 - 暗色主题聊天界面
 - Markdown 渲染支持
-- **系统提示预加载**：启动时加载 CLAUDE.md，所有用户共享
+- **知识库支持**：在指定目录执行，动态读取文档内容
+- **系统提示预加载**：CLAUDE.md 作为系统提示，指导 LLM 如何使用知识库
 - **对话历史上下文**：自动带入最近 5 条历史消息
 - **清空对话功能**：用户可手动开始新对话
-- 支持 SDK 模式（高效）和 CLI 模式（动态读取文档）
+- 支持 CLI 模式（默认，知识库支持）和 SDK 模式（快速纯问答）
 
 ## 系统要求
 
 - Node.js >= 18.0.0
+- Claude CLI（`@anthropic-ai/claude-code`）
 - Anthropic API Key 或私网模型网关
 
 ## 安装步骤
@@ -25,30 +27,38 @@
 
 从 [https://nodejs.org/](https://nodejs.org/) 下载并安装 Node.js。
 
-### 2. 安装项目依赖
+### 2. 安装 Claude CLI
+
+```bash
+npm install -g @anthropic-ai/claude-code
+```
+
+### 3. 安装项目依赖
 
 ```bash
 cd claude_web_server
 npm install
 ```
 
-### 3. 配置环境变量
+### 4. 配置环境变量
 
 ```bash
 # Windows
 set ANTHROPIC_API_KEY=your_api_key
 set ANTHROPIC_BASE_URL=http://your-gateway:8080
 set CLAUDE_MODEL=your_model_name
+set CLAUDE_WORK_DIR=path\to\knowledge-base
 set SYSTEM_PROMPT_FILE=path\to\CLAUDE.md
 
 # Linux/macOS
 export ANTHROPIC_API_KEY=your_api_key
 export ANTHROPIC_BASE_URL=http://your-gateway:8080
 export CLAUDE_MODEL=your_model_name
+export CLAUDE_WORK_DIR=/path/to/knowledge-base
 export SYSTEM_PROMPT_FILE=/path/to/CLAUDE.md
 ```
 
-### 4. 启动服务器
+### 5. 启动服务器
 
 ```bash
 npm start
@@ -64,18 +74,19 @@ npm start
 
 服务器将在 `http://localhost:3000` 启动。
 
-### 私网模型配置示例
+### 私网模型配置示例（CLI 模式）
 
 ```bash
 # Windows
 set ANTHROPIC_BASE_URL=http://192.168.1.100:8080
 set ANTHROPIC_API_KEY=sk-xxx
 set CLAUDE_MODEL=MiniMax-M2.7
-set SYSTEM_PROMPT_FILE=D:\knowledge\CLAUDE.md
+set CLAUDE_WORK_DIR=D:\knowledge-base
+set SYSTEM_PROMPT_FILE=D:\knowledge-base\CLAUDE.md
 npm start
 
 # Linux/macOS
-ANTHROPIC_BASE_URL=http://192.168.1.100:8080 ANTHROPIC_API_KEY=sk-xxx CLAUDE_MODEL=MiniMax-M2.7 SYSTEM_PROMPT_FILE=/path/to/CLAUDE.md npm start
+ANTHROPIC_BASE_URL=http://192.168.1.100:8080 ANTHROPIC_API_KEY=sk-xxx CLAUDE_MODEL=MiniMax-M2.7 CLAUDE_WORK_DIR=/path/to/knowledge-base SYSTEM_PROMPT_FILE=/path/to/knowledge-base/CLAUDE.md npm start
 ```
 
 ### 指定端口
@@ -125,15 +136,20 @@ SYSTEM_PROMPT_FILE=/path/to/CLAUDE.md
 
 ## 两种模式对比
 
-| 特性 | SDK 模式 | CLI 模式 |
-|------|----------|----------|
-| 响应速度 | 快（直接 API） | 较慢（启动进程） |
-| 系统提示 | 支持（预加载） | 支持（目录扫描） |
-| 动态读取文档 | 不支持 | 支持 |
-| 连接方式 | HTTP API | 进程调用 |
-| 配置要求 | API Key | API Key + Claude CLI |
+| 特性 | CLI 模式（默认） | SDK 模式 |
+|------|-----------------|----------|
+| 知识库支持 | ✅ 动态读取文档 | ❌ 无法读取 |
+| 系统提示 | ✅ CLAUDE.md 作为提示 | ✅ CLAUDE.md 作为提示 |
+| 响应速度 | 较慢（启动进程） | 快（直接 API） |
+| 配置要求 | API Key + Claude CLI | 仅 API Key |
 
-**推荐使用 SDK 模式**，响应更快。
+**推荐使用 CLI 模式**（默认），支持知识库上下文。
+
+如需使用 SDK 模式（纯问答，无知识库）：
+```bash
+set USE_SDK=true
+npm start
+```
 
 ## 项目结构
 
@@ -166,10 +182,10 @@ claude_web_server/
 | `ANTHROPIC_API_KEY` | API Key | 必须 |
 | `ANTHROPIC_BASE_URL` | API 网关地址 | Anthropic 官方 |
 | `CLAUDE_MODEL` | 模型名称 | claude-sonnet-4-20250514 |
+| `CLAUDE_WORK_DIR` | 知识库目录（CLI 模式） | 当前目录 |
 | `SYSTEM_PROMPT_FILE` | 系统提示文件路径 | ./CLAUDE.md |
 | `MAX_HISTORY_MESSAGES` | 最大历史消息数 | 5 |
-| `USE_SDK` | 是否使用 SDK 模式 | true |
-| `CLAUDE_WORK_DIR` | CLI 模式工作目录 | 当前目录 |
+| `USE_SDK` | 是否使用 SDK 模式 | false（默认 CLI） |
 
 ## API 接口
 
