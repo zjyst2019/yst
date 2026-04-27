@@ -132,9 +132,31 @@ claude_web_server/
 |------|------|--------|
 | `PORT` | 服务器端口 | 3000 |
 | `ANTHROPIC_API_KEY` | Claude API Key | 必须 |
+| `ANTHROPIC_BASE_URL` | 自定义 API 网关（私网模型） | Anthropic 官方 |
 | `USE_SDK` | 是否使用 SDK 模式 | true |
 | `CLAUDE_WORK_DIR` | CLI 模式工作目录 | 当前目录 |
 | `CLAUDE_MODEL` | Claude 模型 | claude-sonnet-4-20250514 |
+
+## 私网模型支持
+
+如果使用私网部署的 Claude 模型，设置 `ANTHROPIC_BASE_URL` 环境变量：
+
+```bash
+# Windows
+set ANTHROPIC_API_KEY=your_private_api_key
+set ANTHROPIC_BASE_URL=http://your-gateway:port/v1
+npm start
+
+# Linux/macOS
+ANTHROPIC_API_KEY=your_private_api_key ANTHROPIC_BASE_URL=http://your-gateway:port/v1 npm start
+```
+
+示例：
+```bash
+# 常见的私网网关格式
+set ANTHROPIC_BASE_URL=http://192.168.1.100:8080/v1
+set ANTHROPIC_BASE_URL=https://internal-api.company.com/v1
+```
 
 ## API 接口
 

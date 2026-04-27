@@ -15,10 +15,15 @@ const PORT = process.env.PORT || 3000;
 
 // Configure Claude mode and working directory
 console.log(`Claude mode: ${claudeService.getMode()}`);
+if (process.env.ANTHROPIC_BASE_URL) {
+    console.log(`Claude API endpoint: ${process.env.ANTHROPIC_BASE_URL} (private gateway)`);
+} else {
+    console.log(`Claude API endpoint: https://api.anthropic.com (official)`);
+}
 if (process.env.CLAUDE_WORK_DIR) {
     console.log(`Claude working directory: ${process.env.CLAUDE_WORK_DIR}`);
 } else {
-    console.log(`Claude working directory: ${process.cwd()} (default, use CLAUDE_WORK_DIR to change)`);
+    console.log(`Claude working directory: ${process.cwd()} (default)`);
 }
 if (process.env.CLAUDE_MODEL) {
     console.log(`Claude model: ${process.env.CLAUDE_MODEL}`);

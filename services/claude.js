@@ -18,7 +18,18 @@ function getAnthropicClient() {
         if (!apiKey) {
             throw new Error('ANTHROPIC_API_KEY environment variable is required for SDK mode');
         }
-        anthropicClient = new Anthropic({ apiKey });
+
+        // Support custom baseURL for private/self-hosted models
+        const baseURL = process.env.ANTHROPIC_BASE_URL;
+
+        anthropicClient = new Anthropic({
+            apiKey,
+            baseURL: baseURL || undefined  // undefined uses default Anthropic API
+        });
+
+        if (baseURL) {
+            console.log(`Using custom API endpoint: ${baseURL}`);
+        }
     }
     return anthropicClient;
 }
