@@ -111,10 +111,23 @@ function handleMessage(msg) {
     }
 }
 
-function addMessage(role, content) {
+function formatTime(date) {
+    const d = date || new Date();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const seconds = String(d.getSeconds()).padStart(2, '0');
+    return `${hours}:${minutes}:${seconds}`;
+}
+
+function addMessage(role, content, timestamp) {
     const div = document.createElement('div');
     div.className = `message ${role}`;
-    div.innerHTML = `<div class="message-content">${marked.parse(content)}</div>`;
+    const time = timestamp ? new Date(timestamp) : new Date();
+    const timeStr = formatTime(time);
+    div.innerHTML = `
+        <div class="message-time">${timeStr}</div>
+        <div class="message-content">${marked.parse(content)}</div>
+    `;
     messagesEl.appendChild(div);
     scrollToBottom();
     return div;
@@ -131,7 +144,7 @@ async function loadHistory() {
         if (data.messages) {
             messagesEl.innerHTML = '';
             data.messages.forEach(m => {
-                addMessage(m.role, m.content);
+                addMessage(m.role, m.content, m.created_at);
             });
         }
     } catch (e) {

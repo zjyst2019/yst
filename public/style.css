@@ -74,6 +74,16 @@ body {
     border: 1px solid #0f3460;
 }
 
+.message-time {
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 6px;
+}
+
+.message.user .message-time {
+    text-align: right;
+}
+
 .message-content {
     line-height: 1.5;
 }
