@@ -1,0 +1,71 @@
+# Claude CLI Chat Server - Requirements
+
+## System Requirements
+
+1. Node.js >= 18.0.0 (推荐 v20+ 或 v24+)
+   - 用于运行服务器和安装 npm 包
+   - 下载: https://nodejs.org/
+
+2. Claude CLI (Anthropic 官方 CLI 工具)
+   - 用于调用 Claude API 生成回复
+   - 安装: npm install -g @anthropic-ai/claude-code
+   - 需要配置 Anthropic API Key 或 Claude 订阅账号认证
+
+3. Git (可选，用于版本控制)
+   - 下载: https://git-scm.com/
+
+## Node.js Dependencies (通过 npm install 自动安装)
+
+运行 `npm install` 将自动安装以下依赖:
+
+- express@^4.18.2        - Web 服务器框架
+- ws@^8.16.0             - WebSocket 实现
+- better-sqlite3@^12.9.0 - SQLite 数据库绑定
+- uuid@^9.0.1            - UUID 生成工具
+- marked@^12.0.0         - Markdown 解析器 (前端使用 CDN 版本)
+
+## Claude CLI 认证
+
+Claude CLI 需要以下认证方式之一:
+
+1. Anthropic API Key
+   - 设置环境变量: ANTHROPIC_API_KEY=your_api_key
+   - 或运行: claude auth login
+
+2. Claude 订阅账号
+   - 运行: claude setup-token
+   - 需要有 Claude Pro 或 Claude Max 订阅
+
+## 快速安装步骤
+
+# 1. 安装 Node.js (如果尚未安装)
+# Windows: 从 https://nodejs.org/ 下载安装包
+# macOS/Linux: 使用包管理器安装
+
+# 2. 安装 Claude CLI
+npm install -g @anthropic-ai/claude-code
+
+# 3. 认证 Claude CLI
+claude auth login  # 或设置 ANTHROPIC_API_KEY 环境变量
+
+# 4. 进入项目目录
+cd claude_web_server
+
+# 5. 安装项目依赖
+npm install
+
+# 6. 启动服务器
+npm start
+
+# 7. 打开浏览器访问
+http://localhost:3000
+
+## 端口要求
+
+- 默认端口: 3000
+- 可通过环境变量 PORT 自定义: PORT=8080 npm start
+
+## 数据库
+
+- SQLite 数据库文件将自动创建在 data/chat.db
+- 无需额外安装数据库服务
