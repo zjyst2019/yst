@@ -24,7 +24,7 @@ function updateLastActive(id) {
 }
 
 function deleteSession(id) {
-    db.prepare('DELETE FROM sessions WHERE session_id = ?').run(id);
+    db.prepare('DELETE FROM sessions WHERE id = ?').run(id);
 }
 
 // Message operations
