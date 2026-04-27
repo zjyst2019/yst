@@ -153,7 +153,10 @@ async function executeClaudeSDK(sessionId, prompt, history, onStream, onComplete
  * Uses --append-system-prompt to pass CLAUDE.md content as system prompt
  * Uses --add-dir to allow file access in knowledge base directory
  * Uses --tools to enable Read tool for document access
- * History messages are formatted and prepended to the prompt
+ *
+ * Note: If Claude CLI settings file already has API config (baseURL, apiKey, model),
+ * no need to set environment variables. CLI will use settings defaults.
+ * Environment variables can override settings if needed.
  */
 function executeClaudeCLI(sessionId, prompt, history, onStream, onComplete, onError) {
     if (activeRequests.has(sessionId)) {
@@ -168,12 +171,16 @@ function executeClaudeCLI(sessionId, prompt, history, onStream, onComplete, onEr
         '-p',
         '--output-format', 'stream-json',
         '--verbose',
-        '--model', process.env.CLAUDE_MODEL || 'sonnet',
         // Allow CLI to access files in the knowledge base directory
         '--add-dir', workDir,
-        // Enable Read tool so CLI can read documents
+        // Enable tools so CLI can read documents
         '--tools', 'Read,Bash'
     ];
+
+    // Only add --model if explicitly set (otherwise use CLI settings default)
+    if (process.env.CLAUDE_MODEL) {
+        args.push('--model', process.env.CLAUDE_MODEL);
+    }
 
     // Add system prompt if loaded (CLAUDE.md content)
     if (systemPrompt) {
@@ -200,6 +207,7 @@ function executeClaudeCLI(sessionId, prompt, history, onStream, onComplete, onEr
 
     console.log('Executing Claude CLI:', 'claude', args.join(' '));
     console.log('Working directory:', workDir);
+    console.log('System prompt:', systemPrompt ? `${systemPrompt.length} chars` : 'none');
 
     const child = spawn('claude', args, {
         cwd: workDir,

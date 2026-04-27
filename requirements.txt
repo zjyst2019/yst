@@ -9,10 +9,40 @@
 2. Claude CLI (@anthropic-ai/claude-code)
    - 用于调用 Claude API 并读取本地知识库文档
    - 安装: npm install -g @anthropic-ai/claude-code
-   - 需要配置 Anthropic API Key 或私网网关认证
+   - API 配置通过 settings.json 文件配置（推荐）
 
-3. Git (可选，用于版本控制)
-   - 下载: https://git-scm.com/
+## Claude CLI 配置
+
+### 方式一：通过 settings.json 配置（推荐）
+
+配置文件位置：
+- Windows: %USERPROFILE%\.claude\settings.json
+- Linux/macOS: ~/.claude/settings.json
+
+配置示例：
+```json
+{
+  "apiKey": "your-api-key",
+  "baseUrl": "http://192.168.1.100:8080",
+  "model": "MiniMax-M2.7"
+}
+```
+
+查看当前配置：
+```bash
+claude config
+```
+
+### 方式二：通过环境变量配置（可选）
+
+环境变量优先级高于 settings.json，可用于临时覆盖：
+
+```bash
+# Windows
+set ANTHROPIC_API_KEY=your_api_key
+set ANTHROPIC_BASE_URL=http://192.168.1.100:8080
+set CLAUDE_MODEL=MiniMax-M2.7
+```
 
 ## Node.js Dependencies (通过 npm install 自动安装)
 
@@ -25,82 +55,59 @@
 - marked@^12.0.0         - Markdown 解析器 (前端使用 CDN 版本)
 - @anthropic-ai/sdk      - Anthropic API SDK (可选模式)
 
-## Claude CLI 认证
-
-Claude CLI 需要以下认证方式之一:
-
-1. Anthropic API Key
-   - 设置环境变量: ANTHROPIC_API_KEY=your_api_key
-
-2. 私网模型网关
-   - 设置环境变量:
-     - ANTHROPIC_BASE_URL=http://your-gateway:8080
-     - ANTHROPIC_API_KEY=your_api_key
-     - CLAUDE_MODEL=your_model_name
-
 ## 快速安装步骤
 
-# 1. 安装 Node.js (如果尚未安装)
+# 1. 安装 Node.js
 # Windows: 从 https://nodejs.org/ 下载安装包
-# macOS/Linux: 使用包管理器安装
 
 # 2. 安装 Claude CLI
 npm install -g @anthropic-ai/claude-code
 
-# 3. 进入项目目录
+# 3. 配置 Claude CLI settings.json（推荐）
+# 编辑 %USERPROFILE%\.claude\settings.json
+# 填入 apiKey, baseUrl, model
+
+# 4. 进入项目目录
 cd claude_web_server
 
-# 4. 安装项目依赖
+# 5. 安装项目依赖
 npm install
 
-# 5. 配置环境变量 (Windows - CLI 模式)
-set ANTHROPIC_API_KEY=your_api_key
-set ANTHROPIC_BASE_URL=http://192.168.1.100:8080
-set CLAUDE_MODEL=MiniMax-M2.7
+# 6. 配置知识库路径 (Windows)
 set CLAUDE_WORK_DIR=D:\knowledge-base
 set SYSTEM_PROMPT_FILE=D:\knowledge-base\CLAUDE.md
 
-# 6. 启动服务器
+# 7. 启动服务器
 npm start
 
-# 7. 打开浏览器访问
+# 8. 打开浏览器访问
 http://localhost:3000
-
-## CLI 模式 vs SDK 模式
-
-| 模式 | 知识库支持 | 配置 |
-|------|-----------|------|
-| CLI (默认) | 支持 | 需要 Claude CLI + CLAUDE_WORK_DIR |
-| SDK | 不支持 | 仅需 API Key |
-
-CLI 模式下，Claude CLI 会:
-1. 在 CLAUDE_WORK_DIR 目录下执行
-2. 读取目录下的文档作为上下文
-3. CLAUDE.md 作为系统提示，指导如何使用知识库
 
 ## 环境变量配置表
 
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| PORT | 服务器端口 | 3000 |
-| ANTHROPIC_API_KEY | API Key | 必须 |
-| ANTHROPIC_BASE_URL | API 网关地址 | Anthropic 官方 |
-| CLAUDE_MODEL | 模型名称 | claude-sonnet-4-20250514 |
-| CLAUDE_WORK_DIR | 知识库目录 (CLI 模式) | 当前目录 |
-| SYSTEM_PROMPT_FILE | 系统提示文件路径 | ./CLAUDE.md |
-| MAX_HISTORY_MESSAGES | 最大历史消息数 | 5 |
-| USE_SDK | 是否使用 SDK 模式 | false |
+### 必须配置（CLI 模式）
+
+| 变量 | 说明 |
+|------|------|
+| CLAUDE_WORK_DIR | 知识库目录 |
+| SYSTEM_PROMPT_FILE | CLAUDE.md 文件路径 |
+
+### 可选配置（优先级高于 settings.json）
+
+| 变量 | 说明 |
+|------|------|
+| PORT | 服务器端口（默认 3000） |
+| ANTHROPIC_API_KEY | API Key |
+| ANTHROPIC_BASE_URL | API 网关地址 |
+| CLAUDE_MODEL | 模型名称 |
+| MAX_HISTORY_MESSAGES | 最大历史消息数（默认 5） |
+| USE_SDK | 设置为 true 使用 SDK 模式 |
 
 ## 知识库配置
 
-1. CLAUDE.md 文件
-   - 放在知识库目录下
-   - 描述知识库结构和文档位置
-   - 启动时作为系统提示加载
-
-2. 知识库目录结构示例
+1. 知识库目录结构
    ```
-   knowledge-base/
+   D:\knowledge-base\
    ├── CLAUDE.md           # 知识库说明（系统提示）
    ├── wiki/
    │   ├── index.md        # 知识目录
@@ -110,17 +117,26 @@ CLI 模式下，Claude CLI 会:
        └── ...
    ```
 
-3. CLAUDE.md 内容示例
+2. CLAUDE.md 内容示例
    ```markdown
    # 项目知识库
 
    ## 文档结构
-   - wiki/index.md - 知识目录
+   - wiki/index.md - 知识目录，包含所有文档索引
    - wiki/guide/ - 使用指南
    - wiki/api/ - API 文档
 
    ## 查询建议
-   先查阅 index.md 了解文档位置，再定位具体内容。
+   用户提问时，先查阅 wiki/index.md 了解文档位置，
+   然后根据问题内容读取相关文档进行回答。
+   ```
+
+3. 配置示例
+   ```bash
+   # Windows
+   set CLAUDE_WORK_DIR=D:\knowledge-base
+   set SYSTEM_PROMPT_FILE=D:\knowledge-base\CLAUDE.md
+   npm start
    ```
 
 ## 数据库
@@ -129,14 +145,19 @@ CLI 模式下，Claude CLI 会:
 - 无需额外安装数据库服务
 - 存储用户会话和聊天历史
 
-## 端口要求
+## CLI vs SDK 模式
 
-- 默认端口: 3000
-- 可通过环境变量 PORT 自定义
-- 确保端口未被占用
+| 模式 | API 配置方式 | 知识库支持 |
+|------|-------------|-----------|
+| CLI (默认) | settings.json 或环境变量 | 支持 |
+| SDK | 必须环境变量 | 不支持 |
 
-## 网络要求
+## 验证 Claude CLI 配置
 
-- 如使用私网模型，确保网关地址可达
-- 可通过 ping 测试连通性
-- ping 通 = 网络正常
+```bash
+# 测试 CLI 是否正常工作
+claude -p "hello"
+
+# 查看配置
+claude config
+```

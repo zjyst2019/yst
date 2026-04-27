@@ -19,7 +19,6 @@
 
 - Node.js >= 18.0.0
 - Claude CLI（`@anthropic-ai/claude-code`）
-- Anthropic API Key 或私网模型网关
 
 ## 安装步骤
 
@@ -33,32 +32,48 @@
 npm install -g @anthropic-ai/claude-code
 ```
 
-### 3. 安装项目依赖
+### 3. 配置 Claude CLI
+
+CLI 模式下，API 配置可以通过 Claude CLI 的 settings 文件配置（推荐）：
+
+```bash
+# 查看配置文件位置
+claude config
+
+# 或直接编辑配置文件
+# Windows: %USERPROFILE%\.claude\settings.json
+# Linux/macOS: ~/.claude/settings.json
+```
+
+settings.json 示例：
+```json
+{
+  "apiKey": "your-api-key",
+  "baseUrl": "http://192.168.1.100:8080",
+  "model": "MiniMax-M2.7"
+}
+```
+
+### 4. 安装项目依赖
 
 ```bash
 cd claude_web_server
 npm install
 ```
 
-### 4. 配置环境变量
+### 5. 配置知识库路径
 
 ```bash
-# Windows
-set ANTHROPIC_API_KEY=your_api_key
-set ANTHROPIC_BASE_URL=http://your-gateway:8080
-set CLAUDE_MODEL=your_model_name
-set CLAUDE_WORK_DIR=path\to\knowledge-base
-set SYSTEM_PROMPT_FILE=path\to\CLAUDE.md
+# Windows - 仅需配置知识库路径
+set CLAUDE_WORK_DIR=D:\knowledge-base
+set SYSTEM_PROMPT_FILE=D:\knowledge-base\CLAUDE.md
 
 # Linux/macOS
-export ANTHROPIC_API_KEY=your_api_key
-export ANTHROPIC_BASE_URL=http://your-gateway:8080
-export CLAUDE_MODEL=your_model_name
 export CLAUDE_WORK_DIR=/path/to/knowledge-base
-export SYSTEM_PROMPT_FILE=/path/to/CLAUDE.md
+export SYSTEM_PROMPT_FILE=/path/to/knowledge-base/CLAUDE.md
 ```
 
-### 5. 启动服务器
+### 6. 启动服务器
 
 ```bash
 npm start
@@ -179,13 +194,20 @@ claude_web_server/
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | `PORT` | 服务器端口 | 3000 |
-| `ANTHROPIC_API_KEY` | API Key | 必须 |
-| `ANTHROPIC_BASE_URL` | API 网关地址 | Anthropic 官方 |
-| `CLAUDE_MODEL` | 模型名称 | claude-sonnet-4-20250514 |
-| `CLAUDE_WORK_DIR` | 知识库目录（CLI 模式） | 当前目录 |
+| `CLAUDE_WORK_DIR` | 知识库目录（CLI 模式必须） | 当前目录 |
 | `SYSTEM_PROMPT_FILE` | 系统提示文件路径 | ./CLAUDE.md |
 | `MAX_HISTORY_MESSAGES` | 最大历史消息数 | 5 |
-| `USE_SDK` | 是否使用 SDK 模式 | false（默认 CLI） |
+
+### CLI 模式可选环境变量（优先级高于 settings 文件）
+
+| 变量 | 说明 |
+|------|------|
+| `ANTHROPIC_API_KEY` | API Key（如未配置 settings） |
+| `ANTHROPIC_BASE_URL` | API 网关地址（私网模型） |
+| `CLAUDE_MODEL` | 模型名称 |
+| `USE_SDK` | 设置为 true 使用 SDK 模式 |
+
+**注意：** CLI 模式（默认）下，推荐在 Claude CLI 的 `settings.json` 中配置 API 信息，无需设置环境变量。
 
 ## API 接口
 
