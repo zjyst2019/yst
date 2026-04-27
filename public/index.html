@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Chat</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="chat-container">
+        <header class="chat-header">
+            <h1>Claude Chat</h1>
+            <div class="status" id="status">Connecting...</div>
+        </header>
+
+        <main class="chat-messages" id="messages">
+            <!-- Messages will be inserted here -->
+        </main>
+
+        <footer class="chat-input">
+            <textarea id="input" placeholder="Type your message..." rows="3"></textarea>
+            <div class="buttons">
+                <button id="send-btn" disabled>Send</button>
+                <button id="stop-btn" disabled>Stop</button>
+            </div>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
