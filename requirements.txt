@@ -1,15 +1,14 @@
-# Claude CLI Chat Server - Requirements
+# eVS Wiki Chat Server - Requirements
 
-## System Requirements
+## 系统要求
 
 1. Node.js >= 18.0.0 (推荐 v20+ 或 v24+)
    - 用于运行服务器和安装 npm 包
    - 下载: https://nodejs.org/
 
-2. Claude CLI (Anthropic 官方 CLI 工具)
-   - 用于调用 Claude API 生成回复
-   - 安装: npm install -g @anthropic-ai/claude-code
-   - 需要配置 Anthropic API Key 或 Claude 订阅账号认证
+2. Claude API Key 或私网模型网关
+   - Anthropic API Key (官方 API)
+   - 或私网部署的模型网关地址和 API Key
 
 3. Git (可选，用于版本控制)
    - 下载: https://git-scm.com/
@@ -23,18 +22,34 @@
 - better-sqlite3@^12.9.0 - SQLite 数据库绑定
 - uuid@^9.0.1            - UUID 生成工具
 - marked@^12.0.0         - Markdown 解析器 (前端使用 CDN 版本)
+- @anthropic-ai/sdk      - Anthropic API SDK (高效调用)
 
-## Claude CLI 认证
+## 系统提示文件 (可选)
 
-Claude CLI 需要以下认证方式之一:
+- CLAUDE.md - 知识库结构说明文件
+  - 启动时加载，作为系统提示
+  - 所有用户共享，不重复读取
+  - 提升问答效率，避免重复扫描知识库
 
-1. Anthropic API Key
-   - 设置环境变量: ANTHROPIC_API_KEY=your_api_key
-   - 或运行: claude auth login
+## 环境变量配置
 
-2. Claude 订阅账号
-   - 运行: claude setup-token
-   - 需要有 Claude Pro 或 Claude Max 订阅
+### 必须配置
+
+| 变量 | 说明 |
+|------|------|
+| ANTHROPIC_API_KEY | API Key (必须) |
+
+### 可选配置
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| PORT | 服务器端口 | 3000 |
+| ANTHROPIC_BASE_URL | API 网关地址 (私网模型) | Anthropic 官方 |
+| CLAUDE_MODEL | 模型名称 | claude-sonnet-4-20250514 |
+| SYSTEM_PROMPT_FILE | 系统提示文件路径 | ./CLAUDE.md |
+| MAX_HISTORY_MESSAGES | 最大历史消息数 | 5 |
+| USE_SDK | 是否使用 SDK 模式 | true |
+| CLAUDE_WORK_DIR | CLI 模式工作目录 | 当前目录 |
 
 ## 快速安装步骤
 
@@ -42,51 +57,70 @@ Claude CLI 需要以下认证方式之一:
 # Windows: 从 https://nodejs.org/ 下载安装包
 # macOS/Linux: 使用包管理器安装
 
-# 2. 安装 Claude CLI
-npm install -g @anthropic-ai/claude-code
-
-# 3. 认证 Claude CLI
-claude auth login  # 或设置 ANTHROPIC_API_KEY 环境变量
-
-# 4. 进入项目目录
+# 2. 进入项目目录
 cd claude_web_server
 
-# 5. 安装项目依赖
+# 3. 安装项目依赖
 npm install
 
-# 6. 启动服务器
+# 4. 配置环境变量 (Windows)
+set ANTHROPIC_API_KEY=your_api_key
+set ANTHROPIC_BASE_URL=http://192.168.1.100:8080
+set CLAUDE_MODEL=MiniMax-M2.7
+set SYSTEM_PROMPT_FILE=path\to\CLAUDE.md
+
+# 5. 启动服务器
 npm start
 
-# 7. 打开浏览器访问
+# 6. 打开浏览器访问
 http://localhost:3000
 
-## 端口要求
+## 私网模型配置示例
 
-- 默认端口: 3000
-- 可通过环境变量 PORT 自定义: PORT=8080 npm start
-
-## Claude CLI 工作目录配置
-
-如果需要让 Claude CLI 在特定目录执行（例如包含知识库文档的目录），可以通过环境变量配置:
-
-```bash
-# 设置 Claude CLI 工作目录（知识库目录）
-CLAUDE_WORK_DIR=/path/to/your/knowledge-base npm start
-```
-
-示例:
-```bash
 # Windows
-set CLAUDE_WORK_DIR=C:\yst\my_knowledge_base
+set ANTHROPIC_BASE_URL=http://192.168.1.100:8080
+set ANTHROPIC_API_KEY=sk-xxx
+set CLAUDE_MODEL=MiniMax-M2.7
 npm start
 
 # Linux/macOS
-CLAUDE_WORK_DIR=/home/user/my_knowledge_base npm start
-```
-
-这样 Claude CLI 会在该目录下执行，可以访问该目录下的文档作为上下文。
+ANTHROPIC_BASE_URL=http://192.168.1.100:8080 ANTHROPIC_API_KEY=sk-xxx CLAUDE_MODEL=MiniMax-M2.7 npm start
 
 ## 数据库
 
 - SQLite 数据库文件将自动创建在 data/chat.db
 - 无需额外安装数据库服务
+- 存储用户会话和聊天历史
+
+## 知识库上下文配置
+
+如果需要在知识库目录下运行:
+
+1. 创建 CLAUDE.md 文件，描述知识库结构
+2. 设置 SYSTEM_PROMPT_FILE 环境变量指向该文件
+3. 启动时自动加载，所有问答共享该上下文
+
+示例 CLAUDE.md 内容:
+```markdown
+# 项目知识库
+
+## 文档结构
+- wiki/index.md - 知识目录
+- wiki/guide/ - 使用指南
+- wiki/api/ - API 文档
+
+## 查询建议
+先查阅 index.md 了解文档位置，再定位具体内容。
+```
+
+## 端口要求
+
+- 默认端口: 3000
+- 可通过环境变量 PORT 自定义
+- 确保端口未被占用
+
+## 网络要求
+
+- 如使用私网模型，确保网关地址可达
+- 可通过 ping 和 curl 测试连通性
+- ping 通 + curl 返回空白 = 正常 (API 端点可能不响应根路径)
