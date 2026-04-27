@@ -1,21 +1,81 @@
 // services/claude.js
+const Anthropic = require('@anthropic-ai/sdk');
 const { spawn } = require('child_process');
 const fs = require('fs');
 
-// Map to track active processes per session
-const activeProcesses = new Map();
+// Map to track active requests per session
+const activeRequests = new Map();
+
+// Configuration: use SDK (default) or CLI
+const USE_SDK = process.env.USE_SDK !== 'false'; // Default to SDK, set USE_SDK=false to use CLI
+
+// Initialize Anthropic SDK client (singleton, reused across requests)
+let anthropicClient = null;
+
+function getAnthropicClient() {
+    if (!anthropicClient) {
+        const apiKey = process.env.ANTHROPIC_API_KEY;
+        if (!apiKey) {
+            throw new Error('ANTHROPIC_API_KEY environment variable is required for SDK mode');
+        }
+        anthropicClient = new Anthropic({ apiKey });
+    }
+    return anthropicClient;
+}
 
 /**
- * Execute Claude CLI with streaming output
- * @param {string} sessionId - Session identifier
- * @param {string} prompt - User's question
- * @param {function} onStream - Callback for each streaming chunk
- * @param {function} onComplete - Callback when complete
- * @param {function} onError - Callback for errors
+ * Execute Claude using SDK with streaming output
  */
-function executeClaude(sessionId, prompt, onStream, onComplete, onError) {
-    // Check if there's already an active process for this session
-    if (activeProcesses.has(sessionId)) {
+async function executeClaudeSDK(sessionId, prompt, onStream, onComplete, onError) {
+    if (activeRequests.has(sessionId)) {
+        onError('A request is already processing for this session');
+        return null;
+    }
+
+    const client = getAnthropicClient();
+    const abortController = new AbortController();
+    activeRequests.set(sessionId, abortController);
+
+    let fullContent = '';
+
+    try {
+        const stream = client.messages.stream({
+            model: process.env.CLAUDE_MODEL || 'claude-sonnet-4-20250514',
+            max_tokens: 4096,
+            messages: [
+                { role: 'user', content: prompt }
+            ],
+        }, {
+            signal: abortController.signal
+        });
+
+        stream.on('text', (text) => {
+            fullContent += text;
+            onStream(text);
+        });
+
+        await stream.finalMessage();
+
+        activeRequests.delete(sessionId);
+        onComplete(fullContent);
+        return abortController;
+
+    } catch (err) {
+        activeRequests.delete(sessionId);
+        if (err.name === 'AbortError') {
+            // Request was cancelled
+        } else {
+            onError(`SDK error: ${err.message}`);
+        }
+        return null;
+    }
+}
+
+/**
+ * Execute Claude using CLI with streaming output (fallback method)
+ */
+function executeClaudeCLI(sessionId, prompt, onStream, onComplete, onError) {
+    if (activeRequests.has(sessionId)) {
         onError('A request is already processing for this session');
         return null;
     }
@@ -24,7 +84,7 @@ function executeClaude(sessionId, prompt, onStream, onComplete, onError) {
         '-p',
         '--output-format', 'stream-json',
         '--verbose',
-        '--model', 'sonnet',
+        '--model', process.env.CLAUDE_MODEL || 'sonnet',
         prompt
     ], {
         cwd: process.env.CLAUDE_WORK_DIR || process.cwd(),
@@ -32,7 +92,7 @@ function executeClaude(sessionId, prompt, onStream, onComplete, onError) {
         shell: true
     });
 
-    activeProcesses.set(sessionId, child);
+    activeRequests.set(sessionId, child);
 
     let fullContent = '';
     let buffer = '';
@@ -46,7 +106,6 @@ function executeClaude(sessionId, prompt, onStream, onComplete, onError) {
             if (line.trim()) {
                 try {
                     const parsed = JSON.parse(line);
-                    // Handle assistant messages with text content
                     if (parsed.type === 'assistant' && parsed.message?.content) {
                         for (const block of parsed.message.content) {
                             if (block.type === 'text' && block.text) {
@@ -55,9 +114,7 @@ function executeClaude(sessionId, prompt, onStream, onComplete, onError) {
                             }
                         }
                     }
-                    // Also capture final result
                     if (parsed.type === 'result' && parsed.result) {
-                        // Result already captured via assistant messages, but ensure we have it
                         if (!fullContent) {
                             fullContent = parsed.result;
                         }
@@ -74,7 +131,7 @@ function executeClaude(sessionId, prompt, onStream, onComplete, onError) {
     });
 
     child.on('close', (code) => {
-        activeProcesses.delete(sessionId);
+        activeRequests.delete(sessionId);
         if (code === 0) {
             onComplete(fullContent);
         } else {
@@ -83,7 +140,7 @@ function executeClaude(sessionId, prompt, onStream, onComplete, onError) {
     });
 
     child.on('error', (err) => {
-        activeProcesses.delete(sessionId);
+        activeRequests.delete(sessionId);
         onError(`Failed to start Claude CLI: ${err.message}`);
     });
 
@@ -91,30 +148,43 @@ function executeClaude(sessionId, prompt, onStream, onComplete, onError) {
 }
 
 /**
- * Stop an active Claude process
- * @param {string} sessionId - Session identifier
+ * Execute Claude with streaming output
+ * Uses SDK by default, CLI as fallback
+ */
+function executeClaude(sessionId, prompt, onStream, onComplete, onError) {
+    if (USE_SDK) {
+        return executeClaudeSDK(sessionId, prompt, onStream, onComplete, onError);
+    } else {
+        return executeClaudeCLI(sessionId, prompt, onStream, onComplete, onError);
+    }
+}
+
+/**
+ * Stop an active Claude request
  */
 function stopClaude(sessionId) {
-    const child = activeProcesses.get(sessionId);
-    if (child) {
-        child.kill('SIGTERM');
-        activeProcesses.delete(sessionId);
+    const request = activeRequests.get(sessionId);
+    if (request) {
+        if (request instanceof AbortController) {
+            request.abort();
+        } else {
+            request.kill('SIGTERM');
+        }
+        activeRequests.delete(sessionId);
         return true;
     }
     return false;
 }
 
 /**
- * Check if a session has an active process
- * @param {string} sessionId - Session identifier
+ * Check if a session has an active request
  */
 function isActive(sessionId) {
-    return activeProcesses.has(sessionId);
+    return activeRequests.has(sessionId);
 }
 
 /**
  * Set Claude CLI working directory
- * @param {string} dirPath - Directory path for knowledge base context
  */
 function setWorkDir(dirPath) {
     if (fs.existsSync(dirPath)) {
@@ -131,10 +201,18 @@ function getWorkDir() {
     return process.env.CLAUDE_WORK_DIR || process.cwd();
 }
 
+/**
+ * Get current mode (SDK or CLI)
+ */
+function getMode() {
+    return USE_SDK ? 'SDK' : 'CLI';
+}
+
 module.exports = {
     executeClaude,
     stopClaude,
     isActive,
     setWorkDir,
-    getWorkDir
+    getWorkDir,
+    getMode
 };

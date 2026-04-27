@@ -1,6 +1,6 @@
-# Claude CLI Chat Server
+# eVS Wiki Chat Server
 
-一个基于 Claude CLI 的 Web 聊天服务器，支持流式输出和多用户并发。
+一个基于 Claude API 的 Web 聊天服务器，支持流式输出和多用户并发。
 
 ## 功能特性
 
@@ -9,12 +9,12 @@
 - 支持多用户并发使用（不同设备自动隔离）
 - 暗色主题聊天界面
 - Markdown 渲染支持
+- 支持 SDK 模式（高效）和 CLI 模式（知识库上下文）
 
 ## 系统要求
 
 - Node.js >= 18.0.0
-- Claude CLI (`@anthropic-ai/claude-code`)
-- Claude API Key 或 Claude 订阅账号
+- Anthropic API Key
 
 ## 安装步骤
 
@@ -22,19 +22,16 @@
 
 从 [https://nodejs.org/](https://nodejs.org/) 下载并安装 Node.js。
 
-### 2. 安装 Claude CLI
+### 2. 安装项目依赖
 
 ```bash
-npm install -g @anthropic-ai/claude-code
+cd claude_web_server
+npm install
 ```
 
-### 3. 认证 Claude CLI
+### 3. 配置 API Key
 
 ```bash
-# 方式一：登录认证
-claude auth login
-
-# 方式二：设置 API Key 环境变量
 # Windows
 set ANTHROPIC_API_KEY=your_api_key
 
@@ -42,22 +39,32 @@ set ANTHROPIC_API_KEY=your_api_key
 export ANTHROPIC_API_KEY=your_api_key
 ```
 
-### 4. 安装项目依赖
-
-```bash
-cd claude_web_server
-npm install
-```
-
 ## 运行方式
 
-### 基本启动
+### 基本启动（SDK 模式）
 
 ```bash
 npm start
 ```
 
-服务器将在 `http://localhost:3000` 启动。
+SDK 模式直接调用 Anthropic API，响应速度快，适合纯问答场景。
+
+### CLI 模式（支持知识库上下文）
+
+如果需要 Claude 能读取本地知识库文档：
+
+```bash
+# Windows
+set USE_SDK=false
+set CLAUDE_WORK_DIR=C:\path\to\your\knowledge-base
+set ANTHROPIC_API_KEY=your_api_key
+npm start
+
+# Linux/macOS
+USE_SDK=false CLAUDE_WORK_DIR=/path/to/knowledge-base ANTHROPIC_API_KEY=your_api_key npm start
+```
+
+CLI 模式使用 Claude CLI，可以在指定目录下执行，让 Claude 访问本地文档作为上下文。
 
 ### 指定端口
 
@@ -70,17 +77,15 @@ npm start
 PORT=8080 npm start
 ```
 
-### 配置知识库目录
-
-如果需要让 Claude CLI 在特定目录执行（如包含知识库文档的目录）：
+### 指定模型
 
 ```bash
 # Windows
-set CLAUDE_WORK_DIR=C:\path\to\your\knowledge-base
+set CLAUDE_MODEL=claude-opus-4-20250514
 npm start
 
 # Linux/macOS
-CLAUDE_WORK_DIR=/path/to/your/knowledge-base npm start
+CLAUDE_MODEL=claude-opus-4-20250514 npm start
 ```
 
 ### 开发模式（自动重启）
@@ -89,18 +94,28 @@ CLAUDE_WORK_DIR=/path/to/your/knowledge-base npm start
 npm run dev
 ```
 
+## 两种模式对比
+
+| 特性 | SDK 模式 | CLI 模式 |
+|------|----------|----------|
+| 响应速度 | 快（直接 API） | 较慢（启动进程） |
+| 知识库支持 | 无 | 有（读取本地文档） |
+| 连接方式 | HTTP API | 进程调用 |
+| 配置要求 | API Key | API Key + Claude CLI |
+
 ## 项目结构
 
 ```
 claude_web_server/
 ├── server.js              # Express + WebSocket 服务器
 ├── package.json           # 项目依赖配置
+├── README.md              # 项目说明
 ├── requirements.txt       # 系统要求说明
 ├── db/
 │   ├── schema.sql         # 数据库表结构
 │   └── database.js        # SQLite 操作模块
 ├── services/
-│   └── claude.js          # Claude CLI 服务模块
+│   └── claude.js          # Claude API/CLI 服务模块
 ├── routes/
 │   └── api.js             # REST API 路由
 ├── public/
@@ -116,8 +131,10 @@ claude_web_server/
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | `PORT` | 服务器端口 | 3000 |
-| `CLAUDE_WORK_DIR` | Claude CLI 工作目录（知识库目录） | 当前目录 |
-| `ANTHROPIC_API_KEY` | Claude API Key | - |
+| `ANTHROPIC_API_KEY` | Claude API Key | 必须 |
+| `USE_SDK` | 是否使用 SDK 模式 | true |
+| `CLAUDE_WORK_DIR` | CLI 模式工作目录 | 当前目录 |
+| `CLAUDE_MODEL` | Claude 模型 | claude-sonnet-4-20250514 |
 
 ## API 接口
 

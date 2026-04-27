@@ -13,12 +13,15 @@ const wss = new WebSocket.Server({ server });
 
 const PORT = process.env.PORT || 3000;
 
-// Configure Claude CLI working directory (for knowledge base context)
-// Set via environment variable CLAUDE_WORK_DIR
+// Configure Claude mode and working directory
+console.log(`Claude mode: ${claudeService.getMode()}`);
 if (process.env.CLAUDE_WORK_DIR) {
-    console.log(`Claude CLI working directory: ${process.env.CLAUDE_WORK_DIR}`);
+    console.log(`Claude working directory: ${process.env.CLAUDE_WORK_DIR}`);
 } else {
-    console.log(`Claude CLI working directory: ${process.cwd()} (default, use CLAUDE_WORK_DIR to change)`);
+    console.log(`Claude working directory: ${process.cwd()} (default, use CLAUDE_WORK_DIR to change)`);
+}
+if (process.env.CLAUDE_MODEL) {
+    console.log(`Claude model: ${process.env.CLAUDE_MODEL}`);
 }
 
 // Serve static files
