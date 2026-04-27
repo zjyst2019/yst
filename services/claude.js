@@ -151,6 +151,8 @@ async function executeClaudeSDK(sessionId, prompt, history, onStream, onComplete
 /**
  * Execute Claude using CLI with streaming output
  * Uses --append-system-prompt to pass CLAUDE.md content as system prompt
+ * Uses --add-dir to allow file access in knowledge base directory
+ * Uses --tools to enable Read tool for document access
  * History messages are formatted and prepended to the prompt
  */
 function executeClaudeCLI(sessionId, prompt, history, onStream, onComplete, onError) {
@@ -159,12 +161,18 @@ function executeClaudeCLI(sessionId, prompt, history, onStream, onComplete, onEr
         return null;
     }
 
+    const workDir = process.env.CLAUDE_WORK_DIR || process.cwd();
+
     // Build CLI arguments
     const args = [
         '-p',
         '--output-format', 'stream-json',
         '--verbose',
-        '--model', process.env.CLAUDE_MODEL || 'sonnet'
+        '--model', process.env.CLAUDE_MODEL || 'sonnet',
+        // Allow CLI to access files in the knowledge base directory
+        '--add-dir', workDir,
+        // Enable Read tool so CLI can read documents
+        '--tools', 'Read,Bash'
     ];
 
     // Add system prompt if loaded (CLAUDE.md content)
@@ -190,8 +198,11 @@ function executeClaudeCLI(sessionId, prompt, history, onStream, onComplete, onEr
     // Add prompt
     args.push(fullPrompt);
 
+    console.log('Executing Claude CLI:', 'claude', args.join(' '));
+    console.log('Working directory:', workDir);
+
     const child = spawn('claude', args, {
-        cwd: process.env.CLAUDE_WORK_DIR || process.cwd(),
+        cwd: workDir,
         env: { ...process.env },
         shell: true
     });
@@ -202,7 +213,10 @@ function executeClaudeCLI(sessionId, prompt, history, onStream, onComplete, onEr
     let buffer = '';
 
     child.stdout.on('data', (data) => {
-        buffer += data.toString();
+        const rawStr = data.toString();
+        console.log('Claude CLI stdout chunk:', rawStr.substring(0, 200));
+
+        buffer += rawStr;
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
 
@@ -210,6 +224,8 @@ function executeClaudeCLI(sessionId, prompt, history, onStream, onComplete, onEr
             if (line.trim()) {
                 try {
                     const parsed = JSON.parse(line);
+                    console.log('Parsed JSON type:', parsed.type);
+
                     if (parsed.type === 'assistant' && parsed.message?.content) {
                         for (const block of parsed.message.content) {
                             if (block.type === 'text' && block.text) {
@@ -221,10 +237,11 @@ function executeClaudeCLI(sessionId, prompt, history, onStream, onComplete, onEr
                     if (parsed.type === 'result' && parsed.result) {
                         if (!fullContent) {
                             fullContent = parsed.result;
+                            onStream(parsed.result);
                         }
                     }
                 } catch (e) {
-                    // Skip non-JSON lines
+                    console.log('Non-JSON line:', line.substring(0, 100));
                 }
             }
         }
@@ -232,9 +249,31 @@ function executeClaudeCLI(sessionId, prompt, history, onStream, onComplete, onEr
 
     child.stderr.on('data', (data) => {
         console.error(`Claude CLI stderr: ${data}`);
+        // Also check if stderr contains useful JSON output (sometimes mixed)
+        const stderrStr = data.toString();
+        if (stderrStr.includes('type:') && stderrStr.trim().startsWith('{')) {
+            // Try parsing stderr as JSON output
+            const lines = stderrStr.split('\n');
+            for (const line of lines) {
+                if (line.trim().startsWith('{')) {
+                    try {
+                        const parsed = JSON.parse(line);
+                        if (parsed.type === 'assistant' && parsed.message?.content) {
+                            for (const block of parsed.message.content) {
+                                if (block.type === 'text' && block.text) {
+                                    fullContent += block.text;
+                                    onStream(block.text);
+                                }
+                            }
+                        }
+                    } catch (e) {}
+                }
+            }
+        }
     });
 
     child.on('close', (code) => {
+        console.log(`Claude CLI exited with code: ${code}`);
         activeRequests.delete(sessionId);
         if (code === 0) {
             onComplete(fullContent);
@@ -244,6 +283,7 @@ function executeClaudeCLI(sessionId, prompt, history, onStream, onComplete, onEr
     });
 
     child.on('error', (err) => {
+        console.error(`Claude CLI error: ${err.message}`);
         activeRequests.delete(sessionId);
         onError(`Failed to start Claude CLI: ${err.message}`);
     });
