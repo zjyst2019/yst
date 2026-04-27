@@ -1,0 +1,17 @@
+{
+  "name": "claude-web-server",
+  "version": "1.0.0",
+  "description": "Chat server using Claude CLI with WebSocket streaming",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "ws": "^8.16.0",
+    "better-sqlite3": "^12.9.0",
+    "uuid": "^9.0.1",
+    "marked": "^12.0.0"
+  }
+}
