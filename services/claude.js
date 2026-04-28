@@ -17,6 +17,9 @@ const USE_SDK = process.env.USE_SDK === 'true'; // Default to CLI, set USE_SDK=t
 // Max history messages to include in context
 const MAX_HISTORY = parseInt(process.env.MAX_HISTORY_MESSAGES) || 5;
 
+// Disable history context (set DISABLE_HISTORY=true to skip history)
+const DISABLE_HISTORY = process.env.DISABLE_HISTORY === 'true';
+
 // Initialize Anthropic SDK client (singleton, reused across requests)
 let anthropicClient = null;
 
@@ -198,9 +201,9 @@ function executeClaudeCLI(sessionId, prompt, history, onStream, onComplete, onEr
         args.push('--append-system-prompt-file', systemPromptFilePath);
     }
 
-    // Format history messages into prompt context
+    // Format history messages into prompt context (unless disabled)
     let fullPrompt = '';
-    if (history && history.length > 0) {
+    if (!DISABLE_HISTORY && history && history.length > 0) {
         fullPrompt = '以下是之前的对话历史：\n\n';
         for (const msg of history) {
             if (msg.role === 'user') {
@@ -216,8 +219,11 @@ function executeClaudeCLI(sessionId, prompt, history, onStream, onComplete, onEr
     // Add prompt
     args.push(fullPrompt);
 
-    console.log('Executing Claude CLI:', 'claude', args.join(' '));
-    console.log('Working directory:', workDir);
+    console.log('Executing Claude CLI:');
+    console.log('  Working directory:', workDir);
+    console.log('  System prompt file:', systemPromptFilePath || 'none');
+    console.log('  History messages:', history ? history.length : 0, '(disabled:', DISABLE_HISTORY, ')');
+    console.log('  Prompt length:', fullPrompt.length, 'chars');
     console.log('System prompt:', systemPrompt ? `${systemPrompt.length} chars` : 'none');
 
     const child = spawn('claude', args, {
