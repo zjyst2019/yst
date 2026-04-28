@@ -203,11 +203,16 @@ claude_web_server/
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | `PORT` | 服务器端口 | 3000 |
-| `MAX_HISTORY_MESSAGES` | 最大历史消息数 | 5 |
-| `DISABLE_HISTORY` | 禁用历史对话上下文 | false |
-| `SKIP_HOOKS` | 跳过 hooks 和额外处理 | false |
-| `SKIP_PERMISSIONS` | 跳过权限检查 | false |
-| `DISABLE_TOOLS` | 禁用工具调用 | false |
+| `MAX_HISTORY_MESSAGES` | 最大历史消息数（启用历史时有效） | 5 |
+
+### 启用功能（默认都是禁用的）
+
+| 变量 | 说明 | 设置方式 |
+|------|------|----------|
+| `ENABLE_HISTORY=true` | 启用历史对话上下文 | 默认禁用 |
+| `ENABLE_HOOKS=true` | 启用 hooks 和额外处理 | 默认禁用 |
+| `ENABLE_PERMISSIONS=true` | 启用权限检查 | 默认禁用 |
+| `ENABLE_TOOLS=true` | 启用工具调用 | 默认禁用 |
 
 ### CLI 模式可选环境变量（优先级高于 settings 文件）
 

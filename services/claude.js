@@ -17,14 +17,17 @@ const USE_SDK = process.env.USE_SDK === 'true'; // Default to CLI, set USE_SDK=t
 // Max history messages to include in context
 const MAX_HISTORY = parseInt(process.env.MAX_HISTORY_MESSAGES) || 5;
 
-// Disable history context (set DISABLE_HISTORY=true to skip history)
-const DISABLE_HISTORY = process.env.DISABLE_HISTORY === 'true';
+// Disable history context - default true (set ENABLE_HISTORY=true to enable)
+const DISABLE_HISTORY = process.env.ENABLE_HISTORY !== 'true';
 
-// Skip hooks and permissions (set SKIP_HOOKS=true for bare mode)
-const SKIP_HOOKS = process.env.SKIP_HOOKS === 'true';
+// Skip hooks and permissions - default true (set ENABLE_HOOKS=true to enable)
+const SKIP_HOOKS = process.env.ENABLE_HOOKS !== 'true';
 
-// Disable tools (set DISABLE_TOOLS=true to not allow tool calls)
-const DISABLE_TOOLS = process.env.DISABLE_TOOLS === 'true';
+// Skip permission checks - default true (set ENABLE_PERMISSIONS=true to enable)
+const SKIP_PERMISSIONS = process.env.ENABLE_PERMISSIONS !== 'true';
+
+// Disable tools - default true (set ENABLE_TOOLS=true to enable)
+const DISABLE_TOOLS = process.env.ENABLE_TOOLS !== 'true';
 
 // Initialize Anthropic SDK client (singleton, reused across requests)
 let anthropicClient = null;
@@ -192,13 +195,13 @@ function executeClaudeCLI(sessionId, prompt, history, onStream, onComplete, onEr
         '--verbose'
     ];
 
-    // Add --bare to skip hooks and extra processing (optional)
+    // Add --bare to skip hooks and extra processing (default: true)
     if (SKIP_HOOKS) {
         args.push('--bare');
     }
 
-    // Add --dangerously-skip-permissions to bypass permission checks (optional)
-    if (process.env.SKIP_PERMISSIONS === 'true') {
+    // Add --dangerously-skip-permissions to bypass permission checks (default: true)
+    if (SKIP_PERMISSIONS) {
         args.push('--dangerously-skip-permissions');
     }
 
