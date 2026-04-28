@@ -191,16 +191,28 @@ claude_web_server/
 
 ## 环境变量
 
+### 必须配置（CLI 模式）
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `CLAUDE_WORK_DIR` | 知识库目录 | 当前目录 |
+| `SYSTEM_PROMPT_FILE` | 系统提示文件路径 | ./CLAUDE.md |
+
+### 可选配置
+
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | `PORT` | 服务器端口 | 3000 |
-| `CLAUDE_WORK_DIR` | 知识库目录（CLI 模式必须） | 当前目录 |
-| `SYSTEM_PROMPT_FILE` | 系统提示文件路径 | ./CLAUDE.md |
 | `MAX_HISTORY_MESSAGES` | 最大历史消息数 | 5 |
+| `DISABLE_HISTORY` | 禁用历史对话上下文 | false |
+| `SKIP_HOOKS` | 跳过 hooks 和额外处理 | false |
+| `SKIP_PERMISSIONS` | 跳过权限检查 | false |
+| `DISABLE_TOOLS` | 禁用工具调用 | false |
 
 ### CLI 模式可选环境变量（优先级高于 settings 文件）
 
 | 变量 | 说明 |
+|------|------|
 |------|------|
 | `ANTHROPIC_API_KEY` | API Key（如未配置 settings） |
 | `ANTHROPIC_BASE_URL` | API 网关地址（私网模型） |

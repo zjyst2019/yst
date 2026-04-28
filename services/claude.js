@@ -20,6 +20,12 @@ const MAX_HISTORY = parseInt(process.env.MAX_HISTORY_MESSAGES) || 5;
 // Disable history context (set DISABLE_HISTORY=true to skip history)
 const DISABLE_HISTORY = process.env.DISABLE_HISTORY === 'true';
 
+// Skip hooks and permissions (set SKIP_HOOKS=true for bare mode)
+const SKIP_HOOKS = process.env.SKIP_HOOKS === 'true';
+
+// Disable tools (set DISABLE_TOOLS=true to not allow tool calls)
+const DISABLE_TOOLS = process.env.DISABLE_TOOLS === 'true';
+
 // Initialize Anthropic SDK client (singleton, reused across requests)
 let anthropicClient = null;
 
@@ -183,12 +189,26 @@ function executeClaudeCLI(sessionId, prompt, history, onStream, onComplete, onEr
     const args = [
         '-p',
         '--output-format', 'stream-json',
-        '--verbose',
-        // Allow CLI to access files in the knowledge base directory
-        '--add-dir', workDir,
-        // Enable tools so CLI can read documents
-        '--tools', 'Read,Bash'
+        '--verbose'
     ];
+
+    // Add --bare to skip hooks and extra processing (optional)
+    if (SKIP_HOOKS) {
+        args.push('--bare');
+    }
+
+    // Add --dangerously-skip-permissions to bypass permission checks (optional)
+    if (process.env.SKIP_PERMISSIONS === 'true') {
+        args.push('--dangerously-skip-permissions');
+    }
+
+    // Allow CLI to access files in the knowledge base directory
+    args.push('--add-dir', workDir);
+
+    // Enable tools so CLI can read documents (unless disabled)
+    if (!DISABLE_TOOLS) {
+        args.push('--tools', 'Read,Bash');
+    }
 
     // Only add --model if explicitly set (otherwise use CLI settings default)
     if (process.env.CLAUDE_MODEL) {
