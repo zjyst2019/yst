@@ -7,3 +7,9 @@ data/
 
 # Runtime QA cache (regenerated at startup)
 .qa_cache.json
+
+# Local workspace data
+.workbuddy-ai/
+
+# Local notes (not part of the project)
+codex-oss-application.md

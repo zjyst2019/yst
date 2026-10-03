@@ -1,6 +1,25 @@
 # eVS Wiki Chat Server
 
-基于 Claude CLI 的 Web 聊天服务器，支持流式输出、知识库问答、多用户并发和语义缓存。
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18-339933.svg)](https://nodejs.org/)
+
+**A self-hosted web chat server that turns a CLI coding agent (Claude Code CLI) into a knowledge-base Q&A backend** — streaming answers, semantic QA caching, document ingestion, and per-user isolation. Built for air-gapped/internal networks that cannot reach public clouds, with support for private API gateways.
+
+基于 Claude CLI 的 Web 聊天服务器：把 CLI 编码代理封装为知识库问答后端，支持流式输出、语义缓存、文档摄入与多用户隔离。
+
+![界面截图](docs/screenshot.png)
+
+## 架构
+
+![架构图](docs/architecture.png)
+
+| 模块 | 职责 |
+|------|------|
+| `server.js` | Express + WebSocket 主服务器，会话路由与 WS 消息协议 |
+| `services/claude.js` | spawn Claude CLI 子进程，解析 stream-json 流式输出 |
+| `services/qaCache.js` | 问答语义缓存（关键词 Jaccard + Ollama 向量相似度） |
+| `services/knowledgeIngest.js` | 文件 → 知识库 Markdown 转换 |
+| `routes/api.js` | REST API 与管理员 Token 鉴权 |
 
 ## 功能特性
 
