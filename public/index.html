@@ -7,26 +7,199 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="chat-container">
-        <header class="chat-header">
-            <h1>eVS Wiki</h1>
-            <div class="header-controls">
-                <button id="clear-btn" class="clear-btn">清空对话</button>
-                <div class="status" id="status">Connecting...</div>
-            </div>
-        </header>
+    <!-- 配置弹窗 -->
+    <div id="config-modal" class="modal">
+        <div class="modal-content">
+            <h2>API 配置</h2>
+            <p class="modal-desc">请填写您的 API 配置信息，API Key 为必填项</p>
 
-        <main class="chat-messages" id="messages">
-            <!-- Messages will be inserted here -->
-        </main>
-
-        <footer class="chat-input">
-            <textarea id="input" placeholder="Type your message..." rows="3"></textarea>
-            <div class="buttons">
-                <button id="send-btn" disabled>Send</button>
-                <button id="stop-btn" disabled>Stop</button>
+            <div class="form-group">
+                <label for="api-key">API Key <span class="required">*</span></label>
+                <input type="text" id="api-key" placeholder="请输入您的 API Key">
             </div>
-        </footer>
+
+            <div class="form-group">
+                <label for="base-url">网关地址</label>
+                <input type="text" id="base-url" value="http://7.242.99.159:8888/" placeholder="API 网关地址">
+            </div>
+
+            <div class="form-group">
+                <label for="model">模型名称</label>
+                <input type="text" id="model" value="MiniMax-M2.7" placeholder="模型名称">
+            </div>
+
+            <div class="modal-buttons">
+                <button id="save-config-btn" class="save-btn">保存配置</button>
+            </div>
+
+            <p class="config-status" id="config-status"></p>
+        </div>
+    </div>
+
+    <!-- 文件查看弹窗 -->
+    <div id="file-modal" class="modal hidden">
+        <div class="modal-content file-modal-content">
+            <h2 id="file-modal-title">文件内容</h2>
+            <pre id="file-content" class="file-content"></pre>
+            <button id="close-file-btn" class="save-btn">关闭</button>
+        </div>
+    </div>
+
+    <!-- 摄入知识库弹窗 -->
+    <div id="ingest-modal" class="modal hidden">
+        <div class="modal-content ingest-modal-content">
+            <h2>摄入知识库</h2>
+            <p class="modal-desc">选择要摄入的文件，可选填附加提示词指导模型处理</p>
+
+            <div class="ingest-file-list" id="ingest-file-list">
+                <!-- Checkboxes populated by JS -->
+            </div>
+
+            <div class="form-group">
+                <label for="ingest-extra-prompt">附加提示词（可选）</label>
+                <textarea id="ingest-extra-prompt" rows="3" placeholder="例如：请重点关注性能配置相关的内容..."></textarea>
+            </div>
+
+            <div class="modal-buttons">
+                <button id="confirm-ingest-btn" class="save-btn">确认摄入</button>
+                <button id="cancel-ingest-btn" class="cancel-modal-btn">取消</button>
+            </div>
+            <p class="ingest-status" id="ingest-modal-status"></p>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <!-- 左侧文件浏览器 -->
+        <aside class="file-panel">
+            <div class="file-panel-header">
+                <h3>文件浏览器</h3>
+                <button id="refresh-files-btn" class="refresh-btn">刷新</button>
+            </div>
+            <div class="current-path-display">
+                <span id="current-path">根目录</span>
+            </div>
+            <div class="file-toolbar">
+                <button id="create-dir-btn" class="create-dir-btn">+ 新建文件夹</button>
+            </div>
+            <div class="file-upload">
+                <input type="file" id="file-upload-input" multiple>
+                <button id="upload-btn" class="upload-btn">上传文件</button>
+            </div>
+            <div class="knowledge-actions">
+                <button id="ingest-knowledge-btn" class="ingest-knowledge-btn">📥 摄入知识库</button>
+                <span id="ingest-status" class="ingest-status"></span>
+            </div>
+            <div class="file-list" id="file-list">
+                <!-- Files will be loaded here -->
+            </div>
+        </aside>
+
+        <!-- 右侧聊天区域 -->
+        <div class="chat-container">
+            <header class="chat-header">
+                <h1>eVS Wiki</h1>
+                <div class="header-controls">
+                    <button id="help-btn" class="help-btn" title="使用说明">? 帮助</button>
+                    <button id="login-btn" class="login-btn">🔒 登录</button>
+                    <button id="config-btn" class="config-btn">⚙ 配置</button>
+                    <button id="clear-btn" class="clear-btn">清空对话</button>
+                    <span class="cache-status" id="cache-status">缓存: 0</span>
+                    <div class="status" id="status">未配置</div>
+                </div>
+            </header>
+
+            <main class="chat-messages" id="messages">
+                <!-- Messages will be inserted here -->
+            </main>
+
+            <!-- Supplement knowledge bar -->
+            <div id="supplement-bar" class="supplement-bar hidden">
+                <div class="supplement-bar-header">
+                    <span>📝 补充知识 — 请按以下格式提供正确的内容</span>
+                    <button id="cancel-supplement-btn" class="cancel-supplement-btn">取消</button>
+                </div>
+                <div class="supplement-template-hint">
+                    <code>需要补充的知识：&lt;知识内容&gt;</code>
+                    <code>摄入知识的要求：&lt;对提取/整理的要求，可选&gt;</code>
+                </div>
+            </div>
+
+            <footer class="chat-input">
+                <textarea id="input" placeholder="请先配置 API Key 后再进行问答..." rows="3"></textarea>
+                <div class="buttons">
+                    <button id="send-btn" disabled>Send</button>
+                    <button id="stop-btn" disabled>Stop</button>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <!-- 管理员登录弹窗 -->
+    <div id="login-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>管理员登录</h2>
+            <p class="modal-desc">登录后可进行文件删除操作</p>
+
+            <div class="form-group">
+                <label for="login-username">用户名</label>
+                <input type="text" id="login-username" placeholder="请输入用户名">
+            </div>
+
+            <div class="form-group">
+                <label for="login-password">密码</label>
+                <input type="password" id="login-password" placeholder="请输入密码">
+            </div>
+
+            <div class="modal-buttons">
+                <button id="do-login-btn" class="save-btn">登录</button>
+            </div>
+
+            <p class="config-status" id="login-status"></p>
+        </div>
+    </div>
+
+    <!-- 使用说明弹窗 -->
+    <div id="help-modal" class="modal hidden">
+        <div class="modal-content help-modal-content">
+            <div class="help-header">
+                <h2>使用说明</h2>
+                <button id="close-help-btn" class="help-close-btn">×</button>
+            </div>
+            <div class="help-body">
+                <div class="help-section">
+                    <h3>📁 文件浏览器</h3>
+                    <ul>
+                        <li><b>浏览文件</b> — 点击文件夹进入，点击文件查看内容</li>
+                        <li><b>上传文件</b> — 选择文件后点击"上传文件"，上传到当前目录</li>
+                        <li><b>新建文件夹</b> — 点击"+ 新建文件夹"输入名称创建</li>
+                        <li><b>删除文件</b> — 鼠标悬停文件，点击右侧 <span class="help-badge-delete">×</span> 按钮（确认后删除）</li>
+                        <li><b>摄入知识库</b> — 上传文件到 upload/ 目录后，点击"📥 摄入知识库"，勾选文件确认摄入</li>
+                        <li><b>附加提示词</b> — 摄入时可填写，指导模型处理重点（如"重点关注性能配置"）</li>
+                    </ul>
+                </div>
+                <div class="help-section">
+                    <h3>💬 问答结果确认</h3>
+                    <ul>
+                        <li><span class="help-badge satisfied">满意 ✓</span> — 回答满意时点击，将问答存入缓存，后续相似问题直接返回缓存答案</li>
+                        <li><span class="help-badge supplement">补充知识</span> — 回答不满意时点击，按模板格式输入：
+                            <br><b>需要补充的知识：</b>&lt;知识内容&gt;
+                            <br><b>摄入知识的要求：</b>&lt;对提取/整理的要求，可选&gt;
+                            <br>未按模板输入时，AI 会自动分析分离知识内容与指令 → 写入知识库</li>
+                        <li><span class="help-badge auto">自动关联</span> — 系统检测到新回答与缓存答案相似度 ≥ 95%，自动链接问题</li>
+                        <li><span class="help-badge merge">合并确认</span> — 相似度 90%-95% 时提示用户确认，合并为新答案写入缓存</li>
+                        <li><span class="help-badge cache">(缓存)</span> — 该回答直接来自缓存，无需调用 API</li>
+                    </ul>
+                </div>
+                <div class="help-section">
+                    <h3>⌨ 其他操作</h3>
+                    <ul>
+                        <li><b>Stop</b> — 停止正在生成的回答</li>
+                        <li><b>清空对话</b> — 开始新的对话（不保留历史上下文）</li>
+                        <li><b>Enter 发送</b> — 直接按 Enter 键发送消息</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>

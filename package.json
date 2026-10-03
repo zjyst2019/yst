@@ -8,8 +8,9 @@
     "dev": "node --watch server.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.91.1",
     "better-sqlite3": "^12.9.0",
+    "busboy": "^1.6.0",
+    "dotenv": "^17.4.2",
     "express": "^4.18.2",
     "marked": "^12.0.0",
     "uuid": "^9.0.1",

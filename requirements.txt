@@ -1,25 +1,26 @@
-# eVS Wiki Chat Server - Requirements
+# eVS Wiki Chat Server — 系统要求
 
-## 系统要求
+## 运行环境
 
-1. Node.js >= 18.0.0 (推荐 v20+ 或 v24+)
-   - 用于运行服务器和安装 npm 包
+1. Node.js >= 18.0.0（推荐 v20+）
    - 下载: https://nodejs.org/
 
-2. Claude CLI (@anthropic-ai/claude-code)
+2. Claude CLI（@anthropic-ai/claude-code）
    - 用于调用 Claude API 并读取本地知识库文档
-   - 安装: npm install -g @anthropic-ai/claude-code
-   - API 配置通过 settings.json 文件配置（推荐）
+   - 安装: `npm install -g @anthropic-ai/claude-code`
+   - API 配置通过 settings.json 文件配置
+
+3. Ollama（可选）
+   - 用于 Embedding 向量匹配，提升缓存精准度
+   - 安装: https://ollama.com/download
+   - 模型: `ollama pull qwen3-embedding:0.6b`
 
 ## Claude CLI 配置
 
-### 方式一：通过 settings.json 配置（推荐）
-
 配置文件位置：
-- Windows: %USERPROFILE%\.claude\settings.json
-- Linux/macOS: ~/.claude/settings.json
+- Windows: `%USERPROFILE%\.claude\settings.json`
+- Linux/macOS: `~/.claude/settings.json`
 
-配置示例：
 ```json
 {
   "apiKey": "your-api-key",
@@ -28,136 +29,136 @@
 }
 ```
 
-查看当前配置：
+查看当前配置：`claude config`
+
+## Node.js 依赖
+
+运行 `npm install` 自动安装：
+
+| 包名 | 用途 |
+|------|------|
+| express | Web 服务器框架 |
+| ws | WebSocket 实现 |
+| better-sqlite3 | SQLite 数据库（会话存储） |
+| busboy | 文件上传解析 |
+| dotenv | .env 环境变量加载 |
+| uuid | 会话 ID 生成 |
+| marked | Markdown 解析（前端 CDN 加载） |
+
+## 快速安装
+
 ```bash
-claude config
-```
-
-### 方式二：通过环境变量配置（可选）
-
-环境变量优先级高于 settings.json，可用于临时覆盖：
-
-```bash
-# Windows
-set ANTHROPIC_API_KEY=your_api_key
-set ANTHROPIC_BASE_URL=http://192.168.1.100:8080
-set CLAUDE_MODEL=MiniMax-M2.7
-```
-
-## Node.js Dependencies (通过 npm install 自动安装)
-
-运行 `npm install` 将自动安装以下依赖:
-
-- express@^4.18.2        - Web 服务器框架
-- ws@^8.16.0             - WebSocket 实现
-- better-sqlite3@^12.9.0 - SQLite 数据库绑定
-- uuid@^9.0.1            - UUID 生成工具
-- marked@^12.0.0         - Markdown 解析器 (前端使用 CDN 版本)
-- @anthropic-ai/sdk      - Anthropic API SDK (可选模式)
-
-## 快速安装步骤
-
 # 1. 安装 Node.js
-# Windows: 从 https://nodejs.org/ 下载安装包
+# https://nodejs.org/
 
 # 2. 安装 Claude CLI
 npm install -g @anthropic-ai/claude-code
 
-# 3. 配置 Claude CLI settings.json（推荐）
+# 3. 配置 Claude CLI settings.json
 # 编辑 %USERPROFILE%\.claude\settings.json
-# 填入 apiKey, baseUrl, model
 
-# 4. 进入项目目录
+# 4. 安装项目依赖
 cd claude_web_server
-
-# 5. 安装项目依赖
 npm install
 
-# 6. 配置知识库路径 (Windows)
-set CLAUDE_WORK_DIR=D:\knowledge-base
-set SYSTEM_PROMPT_FILE=D:\knowledge-base\CLAUDE.md
+# 5. 配置环境变量
+cp .env.example .env
+# 编辑 .env，至少填入：
+#   CLAUDE_WORK_DIR=/path/to/knowledge-base
+#   SYSTEM_PROMPT_FILE=/path/to/knowledge-base/CLAUDE.md
 
-# 7. 启动服务器
+# 6. 启动
 npm start
 
-# 8. 打开浏览器访问
-http://localhost:3000
+# 7. 浏览器访问
+# http://localhost:3000
+```
 
-## 环境变量配置表
+## 项目配置 (.env)
 
-### 必须配置（CLI 模式）
-
-| 变量 | 说明 |
-|------|------|
-| CLAUDE_WORK_DIR | 知识库目录 |
-| SYSTEM_PROMPT_FILE | CLAUDE.md 文件路径 |
-
-### 可选配置（优先级高于 settings.json）
+### 必填
 
 | 变量 | 说明 |
 |------|------|
-| PORT | 服务器端口（默认 3000） |
-| ANTHROPIC_API_KEY | API Key |
-| ANTHROPIC_BASE_URL | API 网关地址 |
-| CLAUDE_MODEL | 模型名称 |
-| MAX_HISTORY_MESSAGES | 最大历史消息数（默认 5） |
-| USE_SDK | 设置为 true 使用 SDK 模式 |
+| `CLAUDE_WORK_DIR` | 知识库目录 |
+| `SYSTEM_PROMPT_FILE` | CLAUDE.md 文件路径 |
 
-## 知识库配置
+### 可选（所有预设默认值）
 
-1. 知识库目录结构
-   ```
-   D:\knowledge-base\
-   ├── CLAUDE.md           # 知识库说明（系统提示）
-   ├── wiki/
-   │   ├── index.md        # 知识目录
-   │   ├── guide/          # 使用指南
-   │   └── api/            # API 文档
-   └── docs/
-       └── ...
-   ```
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `PORT` | 3000 | 服务端口 |
+| `ENABLE_HISTORY` | false | 启用对话历史上下文 |
+| `ENABLE_HOOKS` | false | 启用 hooks |
+| `ENABLE_PERMISSIONS` | false | 启用权限检查 |
+| `ENABLE_TOOLS` | false | 启用工具调用 |
+| `MAX_HISTORY_MESSAGES` | 5 | 最大历史消息数 |
+| `CLAUDE_RUN_USER` | (空) | root 下 Claude CLI 运行用户 |
+| `USE_EMBEDDING` | false | 启用向量相似度 |
+| `OLLAMA_URL` | http://localhost:11434 | Ollama 地址 |
+| `EMBEDDING_MODEL` | qwen3-embedding:0.6b | Embedding 模型 |
+| `CACHE_MAX_SIZE` | 500 | 最大缓存条目 |
+| `CACHE_QUESTION_SIMILARITY` | 0.88 | 问题命中阈值 |
+| `CACHE_ANSWER_HIGH` | 0.95 | 答案自动关联阈值 |
+| `CACHE_ANSWER_MERGE` | 0.90 | 答案合并确认阈值 |
+| `CACHE_ANSWER_HEAD_LEN` | 250 | 答案截断头长度 |
+| `CACHE_ANSWER_TAIL_LEN` | 250 | 答案截断尾长度 |
+| `CACHE_EMBEDDING_LRU_SIZE` | 200 | Embedding 缓存上限 |
+| `CACHE_SAVE_DEBOUNCE_MS` | 500 | 磁盘写入防抖(ms) |
+| `KNOWLEDGE_UPLOAD_DIR` | `<工作目录>/upload` | 文件摄入目录 |
 
-2. CLAUDE.md 内容示例
-   ```markdown
-   # 项目知识库
+## 管理员鉴权
 
-   ## 文档结构
-   - wiki/index.md - 知识目录，包含所有文档索引
-   - wiki/guide/ - 使用指南
-   - wiki/api/ - API 文档
-
-   ## 查询建议
-   用户提问时，先查阅 wiki/index.md 了解文档位置，
-   然后根据问题内容读取相关文档进行回答。
-   ```
-
-3. 配置示例
-   ```bash
-   # Windows
-   set CLAUDE_WORK_DIR=D:\knowledge-base
-   set SYSTEM_PROMPT_FILE=D:\knowledge-base\CLAUDE.md
-   npm start
-   ```
+- 默认账号密码：`admin` / `admin`
+- 未登录：所有功能正常使用，文件列表不显示删除按钮
+- 登录后：可删除文件/目录
+- 修改密码：编辑 `routes/api.js` 中的 `ADMIN_USER` / `ADMIN_PASS`
 
 ## 数据库
 
-- SQLite 数据库文件将自动创建在 data/chat.db
-- 无需额外安装数据库服务
-- 存储用户会话和聊天历史
+- SQLite 文件：`data/chat.db`（自动创建）
+- 存储会话和聊天历史，无需额外数据库服务
 
-## CLI vs SDK 模式
+## 知识库结构参考
 
-| 模式 | API 配置方式 | 知识库支持 |
-|------|-------------|-----------|
-| CLI (默认) | settings.json 或环境变量 | 支持 |
-| SDK | 必须环境变量 | 不支持 |
+```
+knowledge-base/
+├── CLAUDE.md              # 知识库说明（系统提示）
+├── wiki/
+│   ├── index.md           # 知识目录
+│   ├── guide/             # 使用指南
+│   └── api/               # API 文档
+├── upload/                # 文件摄入暂存区
+│   ├── processed/         # 已摄入文件归档
+│   └── failed/            # 摄入失败文件归档
+└── improve/               # 问答补充暂存
+```
 
-## 验证 Claude CLI 配置
+## 补充知识模板
+
+点击"补充知识"后，输入框会预填模板格式：
+
+```
+需要补充的知识：
+<知识内容>
+
+摄入知识的要求：
+<对提取/整理的要求，可选>
+```
+
+- 按模板填写时，后端直接解析知识内容与处理要求
+- 未按模板填写时，AI 自动分析并分离知识内容与指令
+
+## 验证安装
 
 ```bash
-# 测试 CLI 是否正常工作
+# 测试 Claude CLI
 claude -p "hello"
 
 # 查看配置
 claude config
+
+# 启动服务
+npm start
+# 打开 http://localhost:3000
 ```

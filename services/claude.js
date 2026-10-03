@@ -1,5 +1,4 @@
 // services/claude.js
-const Anthropic = require('@anthropic-ai/sdk');
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -10,9 +9,6 @@ const activeRequests = new Map();
 // System prompt cache (loaded once at startup, shared across all users)
 let systemPrompt = null;
 let systemPromptFilePath = null;  // Store the file path for CLI mode
-
-// Configuration: use SDK or CLI (CLI is default for knowledge base support)
-const USE_SDK = process.env.USE_SDK === 'true'; // Default to CLI, set USE_SDK=true to use SDK
 
 // Max history messages to include in context
 const MAX_HISTORY = parseInt(process.env.MAX_HISTORY_MESSAGES) || 5;
@@ -29,29 +25,54 @@ const SKIP_PERMISSIONS = process.env.ENABLE_PERMISSIONS !== 'true';
 // Disable tools - default true (set ENABLE_TOOLS=true to enable)
 const DISABLE_TOOLS = process.env.ENABLE_TOOLS !== 'true';
 
-// Initialize Anthropic SDK client (singleton, reused across requests)
-let anthropicClient = null;
+// Helper function to filter content blocks (skip thinking blocks)
+function filterContentBlocks(blocks) {
+    return blocks.filter(block => block.type !== 'thinking');
+}
 
-function getAnthropicClient() {
-    if (!anthropicClient) {
-        const apiKey = process.env.ANTHROPIC_API_KEY;
-        if (!apiKey) {
-            throw new Error('ANTHROPIC_API_KEY environment variable is required for SDK mode');
+/**
+ * Create a stateful thinking filter that handles <thinking> blocks
+ * spanning multiple streaming chunks. Returns a filter function
+ * that processes each chunk and returns { output, thinking }.
+ */
+function createThinkingFilter() {
+    let inThinking = false;
+
+    return function filterChunk(text) {
+        if (!text) return { output: '', thinking: '' };
+
+        let output = '';
+        let thinkingLog = '';
+        let remaining = text;
+
+        while (remaining.length > 0) {
+            if (inThinking) {
+                // Looking for closing tag
+                const endMatch = remaining.match(/<\/think(?:ing)?>/i);
+                if (endMatch) {
+                    thinkingLog += remaining.substring(0, endMatch.index);
+                    remaining = remaining.substring(endMatch.index + endMatch[0].length);
+                    inThinking = false;
+                } else {
+                    thinkingLog += remaining;
+                    remaining = '';
+                }
+            } else {
+                // Looking for opening tag
+                const startMatch = remaining.match(/<think(?:ing)?>/i);
+                if (startMatch) {
+                    output += remaining.substring(0, startMatch.index);
+                    remaining = remaining.substring(startMatch.index + startMatch[0].length);
+                    inThinking = true;
+                } else {
+                    output += remaining;
+                    remaining = '';
+                }
+            }
         }
 
-        // Support custom baseURL for private/self-hosted models
-        const baseURL = process.env.ANTHROPIC_BASE_URL;
-
-        anthropicClient = new Anthropic({
-            apiKey,
-            baseURL: baseURL || undefined  // undefined uses default Anthropic API
-        });
-
-        if (baseURL) {
-            console.log(`Using custom API endpoint: ${baseURL}`);
-        }
-    }
-    return anthropicClient;
+        return { output: output.trimStart(), thinking: thinkingLog };
+    };
 }
 
 /**
@@ -88,89 +109,6 @@ function getSystemPromptFilePath() {
 }
 
 /**
- * Build messages array for API request
- * Includes history messages + new user message
- */
-function buildMessages(history, userMessage) {
-    const messages = [];
-
-    // Add history messages (if any)
-    if (history && history.length > 0) {
-        for (const msg of history) {
-            messages.push({
-                role: msg.role,
-                content: msg.content
-            });
-        }
-    }
-
-    // Add new user message
-    messages.push({ role: 'user', content: userMessage });
-
-    return messages;
-}
-
-/**
- * Execute Claude using SDK with streaming output
- * @param {string} sessionId - Session identifier
- * @param {string} prompt - User's current question
- * @param {Array} history - History messages (from database)
- * @param {function} onStream - Callback for each streaming chunk
- * @param {function} onComplete - Callback when complete
- * @param {function} onError - Callback for errors
- */
-async function executeClaudeSDK(sessionId, prompt, history, onStream, onComplete, onError) {
-    if (activeRequests.has(sessionId)) {
-        onError('A request is already processing for this session');
-        return null;
-    }
-
-    const client = getAnthropicClient();
-    const abortController = new AbortController();
-    activeRequests.set(sessionId, abortController);
-
-    let fullContent = '';
-
-    try {
-        // Build request with system prompt and history
-        const requestOptions = {
-            model: process.env.CLAUDE_MODEL || 'claude-sonnet-4-20250514',
-            max_tokens: 4096,
-            messages: buildMessages(history, prompt),
-        };
-
-        // Add system prompt if loaded
-        if (systemPrompt) {
-            requestOptions.system = systemPrompt;
-        }
-
-        const stream = client.messages.stream(requestOptions, {
-            signal: abortController.signal
-        });
-
-        stream.on('text', (text) => {
-            fullContent += text;
-            onStream(text);
-        });
-
-        await stream.finalMessage();
-
-        activeRequests.delete(sessionId);
-        onComplete(fullContent);
-        return abortController;
-
-    } catch (err) {
-        activeRequests.delete(sessionId);
-        if (err.name === 'AbortError') {
-            // Request was cancelled
-        } else {
-            onError(`SDK error: ${err.message}`);
-        }
-        return null;
-    }
-}
-
-/**
  * Execute Claude using CLI with streaming output
  * Uses --append-system-prompt to pass CLAUDE.md content as system prompt
  * Uses --add-dir to allow file access in knowledge base directory
@@ -180,7 +118,7 @@ async function executeClaudeSDK(sessionId, prompt, history, onStream, onComplete
  * no need to set environment variables. CLI will use settings defaults.
  * Environment variables can override settings if needed.
  */
-function executeClaudeCLI(sessionId, prompt, history, onStream, onComplete, onError) {
+function executeClaudeCLI(sessionId, prompt, history, userConfig, onStream, onComplete, onError) {
     if (activeRequests.has(sessionId)) {
         onError('A request is already processing for this session');
         return null;
@@ -189,8 +127,9 @@ function executeClaudeCLI(sessionId, prompt, history, onStream, onComplete, onEr
     const workDir = process.env.CLAUDE_WORK_DIR || process.cwd();
 
     // Build CLI arguments
+    // Use '-p -' to read prompt from stdin (avoids shell interpreting prompt as commands)
     const args = [
-        '-p',
+        '-p', '-',
         '--output-format', 'stream-json',
         '--verbose'
     ];
@@ -200,9 +139,18 @@ function executeClaudeCLI(sessionId, prompt, history, onStream, onComplete, onEr
         args.push('--bare');
     }
 
+    // Determine if root, and if we'll switch user for Claude CLI
+    const isRoot = process.getuid && process.getuid() === 0;
+    const runAsUser = isRoot ? (process.env.CLAUDE_RUN_USER || '') : '';
+
     // Add --dangerously-skip-permissions to bypass permission checks (default: true)
-    if (SKIP_PERMISSIONS) {
+    // Claude CLI forbids this flag when running as root, but if we use runuser
+    // to switch to a non-root user, we can safely add it.
+    if (SKIP_PERMISSIONS && (!isRoot || runAsUser)) {
         args.push('--dangerously-skip-permissions');
+    }
+    if (isRoot && !runAsUser) {
+        console.log('Running as root, --dangerously-skip-permissions skipped. Set CLAUDE_RUN_USER to run Claude CLI as non-root user.');
     }
 
     // Allow CLI to access files in the knowledge base directory
@@ -213,9 +161,10 @@ function executeClaudeCLI(sessionId, prompt, history, onStream, onComplete, onEr
         args.push('--tools', 'Read,Bash');
     }
 
-    // Only add --model if explicitly set (otherwise use CLI settings default)
-    if (process.env.CLAUDE_MODEL) {
-        args.push('--model', process.env.CLAUDE_MODEL);
+    // Use model from userConfig or environment
+    const modelToUse = userConfig?.model || process.env.CLAUDE_MODEL;
+    if (modelToUse) {
+        args.push('--model', modelToUse);
     }
 
     // Add system prompt using file path (better for multi-line content)
@@ -239,30 +188,56 @@ function executeClaudeCLI(sessionId, prompt, history, onStream, onComplete, onEr
     }
     fullPrompt += prompt;
 
-    // Add prompt
-    args.push(fullPrompt);
-
     console.log('Executing Claude CLI:');
     console.log('  Working directory:', workDir);
     console.log('  System prompt file:', systemPromptFilePath || 'none');
     console.log('  History messages:', history ? history.length : 0, '(disabled:', DISABLE_HISTORY, ')');
     console.log('  Prompt length:', fullPrompt.length, 'chars');
-    console.log('System prompt:', systemPrompt ? `${systemPrompt.length} chars` : 'none');
+    console.log('  System prompt:', systemPrompt ? `${systemPrompt.length} chars` : 'none');
+    console.log('  User config:');
+    console.log('    API Key:', userConfig?.apiKey ? `${userConfig.apiKey.substring(0, 8)}...` : 'not provided');
+    console.log('    Base URL:', userConfig?.baseUrl || 'default');
+    console.log('    Model:', modelToUse || 'default');
 
-    const child = spawn('claude', args, {
-        cwd: workDir,
-        env: { ...process.env },
-        shell: true
-    });
+    // Build environment with user-specific API config
+    const env = { ...process.env };
+    if (userConfig?.apiKey) {
+        env.ANTHROPIC_API_KEY = userConfig.apiKey;
+    }
+    if (userConfig?.baseUrl) {
+        env.ANTHROPIC_BASE_URL = userConfig.baseUrl;
+    }
+
+    // If running as root with CLAUDE_RUN_USER set, spawn claude under that user.
+    // This allows --dangerously-skip-permissions and Bash tool access.
+    let child;
+    if (runAsUser) {
+        console.log(`  Running Claude CLI as user: ${runAsUser}`);
+        const escapedArgs = args.map(a => `'${a.replace(/'/g, "'\\''")}'`).join(' ');
+        child = spawn('runuser', ['-u', runAsUser, '--', 'bash', '-c', `cd '${workDir}' && claude ${escapedArgs}`], {
+            cwd: workDir,
+            env: env
+        });
+    } else {
+        child = spawn('claude', args, {
+            cwd: workDir,
+            env: env,
+            shell: true
+        });
+    }
+
+    // Write prompt via stdin (avoids shell interpreting prompt content as commands)
+    child.stdin.write(fullPrompt);
+    child.stdin.end();
 
     activeRequests.set(sessionId, child);
 
     let fullContent = '';
     let buffer = '';
+    const thinkFilter = createThinkingFilter();
 
     child.stdout.on('data', (data) => {
         const rawStr = data.toString();
-        console.log('Claude CLI stdout chunk:', rawStr.substring(0, 200));
 
         buffer += rawStr;
         const lines = buffer.split('\n');
@@ -275,47 +250,95 @@ function executeClaudeCLI(sessionId, prompt, history, onStream, onComplete, onEr
                     console.log('Parsed JSON type:', parsed.type);
 
                     if (parsed.type === 'assistant' && parsed.message?.content) {
-                        for (const block of parsed.message.content) {
+                        // Check if THIS message contains tool use blocks
+                        const hasToolUse = parsed.message.content.some(
+                            b => b.type === 'tool_use'
+                        );
+
+                        for (const block of filterContentBlocks(parsed.message.content)) {
                             if (block.type === 'text' && block.text) {
-                                fullContent += block.text;
-                                onStream(block.text);
+                                const { output, thinking } = thinkFilter(block.text);
+                                if (thinking) {
+                                    console.log('[Thinking]', thinking.substring(0, 300));
+                                }
+                                if (!output) continue;
+
+                                if (hasToolUse) {
+                                    // Text alongside tool_use → planning, log only
+                                    console.log('[Planning]', output.substring(0, 200));
+                                } else {
+                                    // Text without tool_use → answer, stream to frontend
+                                    fullContent += output;
+                                    onStream(output);
+                                }
                             }
                         }
                     }
                     if (parsed.type === 'result' && parsed.result) {
                         if (!fullContent) {
-                            fullContent = parsed.result;
-                            onStream(parsed.result);
+                            const { output, thinking } = thinkFilter(parsed.result);
+                            if (thinking) {
+                                console.log('[Thinking]', thinking.substring(0, 300));
+                            }
+                            if (output) {
+                                fullContent = output;
+                                onStream(output);
+                            }
                         }
                     }
                 } catch (e) {
-                    console.log('Non-JSON line:', line.substring(0, 100));
+                    const { output, thinking } = thinkFilter(line);
+                    if (thinking) {
+                        console.log('[Thinking in raw]', thinking.substring(0, 200));
+                    }
+                    if (output) {
+                        console.log('Non-JSON line:', output.substring(0, 100));
+                    }
                 }
             }
         }
     });
 
     child.stderr.on('data', (data) => {
-        console.error(`Claude CLI stderr: ${data}`);
-        // Also check if stderr contains useful JSON output (sometimes mixed)
         const stderrStr = data.toString();
+        // Also check if stderr contains useful JSON output (sometimes mixed)
         if (stderrStr.includes('type:') && stderrStr.trim().startsWith('{')) {
-            // Try parsing stderr as JSON output
             const lines = stderrStr.split('\n');
             for (const line of lines) {
                 if (line.trim().startsWith('{')) {
                     try {
                         const parsed = JSON.parse(line);
                         if (parsed.type === 'assistant' && parsed.message?.content) {
-                            for (const block of parsed.message.content) {
+                            const hasToolUse = parsed.message.content.some(
+                                b => b.type === 'tool_use'
+                            );
+                            for (const block of filterContentBlocks(parsed.message.content)) {
                                 if (block.type === 'text' && block.text) {
-                                    fullContent += block.text;
-                                    onStream(block.text);
+                                    const { output, thinking } = thinkFilter(block.text);
+                                    if (thinking) {
+                                        console.log('[Thinking]', thinking.substring(0, 300));
+                                    }
+                                    if (output) {
+                                        if (hasToolUse) {
+                                            console.log('[Planning]', output.substring(0, 200));
+                                        } else {
+                                            fullContent += output;
+                                            onStream(output);
+                                        }
+                                    }
                                 }
                             }
                         }
                     } catch (e) {}
                 }
+            }
+        } else {
+            const { output, thinking } = thinkFilter(stderrStr);
+            if (thinking) {
+                console.log('[Thinking]', thinking.substring(0, 200));
+            }
+            if (output) {
+                console.error('Claude CLI stderr:', output.substring(0, 200));
             }
         }
     });
@@ -345,16 +368,13 @@ function executeClaudeCLI(sessionId, prompt, history, onStream, onComplete, onEr
  * @param {string} sessionId - Session identifier
  * @param {string} prompt - User's current question
  * @param {Array} history - History messages (from database, optional)
+ * @param {Object} userConfig - User-specific API config { apiKey, baseUrl, model }
  * @param {function} onStream - Callback for each streaming chunk
  * @param {function} onComplete - Callback when complete
  * @param {function} onError - Callback for errors
  */
-function executeClaude(sessionId, prompt, history, onStream, onComplete, onError) {
-    if (USE_SDK) {
-        return executeClaudeSDK(sessionId, prompt, history, onStream, onComplete, onError);
-    } else {
-        return executeClaudeCLI(sessionId, prompt, history, onStream, onComplete, onError);
-    }
+function executeClaude(sessionId, prompt, history, userConfig, onStream, onComplete, onError) {
+    return executeClaudeCLI(sessionId, prompt, history, userConfig, onStream, onComplete, onError);
 }
 
 /**
@@ -363,11 +383,7 @@ function executeClaude(sessionId, prompt, history, onStream, onComplete, onError
 function stopClaude(sessionId) {
     const request = activeRequests.get(sessionId);
     if (request) {
-        if (request instanceof AbortController) {
-            request.abort();
-        } else {
-            request.kill('SIGTERM');
-        }
+        request.kill('SIGTERM');
         activeRequests.delete(sessionId);
         return true;
     }
@@ -399,22 +415,13 @@ function getWorkDir() {
     return process.env.CLAUDE_WORK_DIR || process.cwd();
 }
 
-/**
- * Get current mode (SDK or CLI)
- */
-function getMode() {
-    return USE_SDK ? 'SDK' : 'CLI';
-}
-
 module.exports = {
     loadSystemPrompt,
     getSystemPrompt,
     getSystemPromptFilePath,
-    buildMessages,
     executeClaude,
     stopClaude,
     isActive,
     setWorkDir,
-    getWorkDir,
-    getMode
+    getWorkDir
 };
